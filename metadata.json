@@ -1,0 +1,6 @@
+{
+  "name": "烫金膜MES排产看板",
+  "description": "用于烫金膜生产排产计划的MES大屏可视化系统，包含表格、甘特图和任务视图。",
+  "requestFramePermissions": [],
+  "majorCapabilities": []
+}
