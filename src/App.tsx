@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { TableView } from './components/TableView';
 import { CalendarView } from './components/CalendarView';
 import { TaskView } from './components/TaskView';
@@ -7,7 +7,8 @@ import { TaskDetailModal } from './components/TaskDetailModal';
 import { SettingsModal } from './components/SettingsModal';
 import { ExcelPreviewModal } from './components/ExcelPreviewModal';
 import { INITIAL_TASKS, MACHINES } from './data';
-import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Play, Square, Search } from 'lucide-react';
+import { fetchTasksFromWps, getWpsAccessToken } from './services/wps';
+import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Play, Square, Search, Loader2 } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { cn } from './components/MetricCard';
 import { motion, AnimatePresence } from 'motion/react';
@@ -18,12 +19,13 @@ type ViewMode = 'table' | 'calendar' | 'task';
 
 export default function App() {
   const [viewMode, setViewMode] = useLocalStorage<ViewMode>('mes_viewMode', 'calendar');
-  const [tasks, setTasks] = useState(INITIAL_TASKS);
+  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [isAutoScrolling, setIsAutoScrolling] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const currentTime = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
 
@@ -59,15 +61,49 @@ export default function App() {
     if (url) setPreviewUrl(url);
   };
 
-  const handleSyncWPS = async (config: any) => {
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        console.log('Syncing with WPS API:', config);
-        setTasks([...INITIAL_TASKS]);
-        resolve();
-      }, 1500);
-    });
+  // Common sync logic from WPS
+  const syncTasksFromWps = async (): Promise<void> => {
+    try {
+      setIsSyncing(true);
+      const token = await getWpsAccessToken();
+      const wpsTasks = await fetchTasksFromWps(token);
+      if (wpsTasks.length > 0) {
+        setTasks(wpsTasks);
+        console.log(`Synced ${wpsTasks.length} tasks from WPS`);
+      } else {
+        console.warn('No tasks found in WPS spreadsheet, keeping current data');
+      }
+    } catch (err) {
+      console.error('WPS sync failed:', err);
+      throw err;
+    } finally {
+      setIsSyncing(false);
+    }
   };
+
+  const handleSyncWPS = async (
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    config: any
+  ): Promise<void> => {
+    await syncTasksFromWps();
+  };
+
+  // Auto sync on app start
+  useEffect(() => {
+    const autoSync = async () => {
+      // Only auto-sync if WPS is configured
+      if (import.meta.env.VITE_WPS_APP_ID && import.meta.env.VITE_WPS_SPREADSHEET_ID) {
+        try {
+          await syncTasksFromWps();
+          console.log('Auto-sync completed on startup');
+        } catch (err) {
+          console.error('Auto WPS sync failed, using initial data:', err);
+        }
+      }
+    };
+
+    autoSync();
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30 flex flex-col">
@@ -130,6 +166,13 @@ export default function App() {
             <Clock className="w-4 h-4" />
             {currentTime}
           </div>
+
+          {isSyncing && (
+            <div className="text-sm text-blue-300 bg-blue-950/50 px-3 py-1.5 rounded-lg border border-blue-900/50 flex items-center gap-2 animate-pulse">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              同步中...
+            </div>
+          )}
 
           <button 
             onClick={() => setIsAutoScrolling(!isAutoScrolling)}
