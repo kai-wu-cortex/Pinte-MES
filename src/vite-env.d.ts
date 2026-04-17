@@ -6,6 +6,7 @@ interface ImportMetaEnv {
   readonly VITE_WPS_SPREADSHEET_ID?: string;
   readonly VITE_WPS_API_BASE?: string;
   readonly VITE_WPS_DEFAULT_RANGE?: string;
+  readonly VITE_WPS_REDIRECT_URI?: string;
 }
 
 interface ImportMeta {

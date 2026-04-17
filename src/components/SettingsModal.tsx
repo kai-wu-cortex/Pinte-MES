@@ -1,20 +1,51 @@
 import React, { useState } from 'react';
-import { X, Save, Database, Link as LinkIcon, Key, FileSpreadsheet, Loader2 } from 'lucide-react';
+import { X, Save, Database, Link as LinkIcon, Key, FileSpreadsheet, Loader2, RefreshCw, KeyRound, ExternalLink } from 'lucide-react';
+import { getWpsAuthorizationUrl } from '../services/wps';
 
 interface SettingsModalProps {
   onClose: () => void;
   onSync: (config: any) => Promise<void>;
+  onGetToken: (code: string) => Promise<void>;
+  onRefreshToken: () => Promise<void>;
+  tokenStatus: 'idle' | 'success' | 'error';
+  isGettingToken: boolean;
 }
 
-export function SettingsModal({ onClose, onSync }: SettingsModalProps) {
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [config, setConfig] = useState({
+// Load saved config from localStorage on initialization
+const loadSavedConfig = () => {
+  const saved = localStorage.getItem('wps_config');
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return {
+        apiUrl: 'https://openapi.wps.cn',
+        appId: '',
+        appKey: '',
+        fileId: '',
+        code: '',
+      };
+    }
+  }
+  return {
     apiUrl: 'https://openapi.wps.cn',
     appId: '',
     appKey: '',
     fileId: '',
-  });
+    code: '',
+  };
+};
+
+export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tokenStatus, isGettingToken }: SettingsModalProps) {
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [config, setConfig] = useState(loadSavedConfig());
+
+  // Save config to localStorage when it changes
+  const saveConfig = (newConfig: typeof config) => {
+    localStorage.setItem('wps_config', JSON.stringify(newConfig));
+    setConfig(newConfig);
+  };
 
   const handleSync = async () => {
     setIsSyncing(true);
@@ -30,6 +61,17 @@ export function SettingsModal({ onClose, onSync }: SettingsModalProps) {
     } finally {
       setIsSyncing(false);
     }
+  };
+
+  const handleGetToken = async () => {
+    if (!config.code.trim()) {
+      return;
+    }
+    await onGetToken(config.code);
+  };
+
+  const handleRefreshToken = async () => {
+    await onRefreshToken();
   };
 
   return (
@@ -60,10 +102,10 @@ export function SettingsModal({ onClose, onSync }: SettingsModalProps) {
             <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1.5">
               <LinkIcon className="w-3.5 h-3.5" /> API 地址
             </label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={config.apiUrl}
-              onChange={e => setConfig({...config, apiUrl: e.target.value})}
+              onChange={e => saveConfig({...config, apiUrl: e.target.value})}
               className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
               placeholder="https://openapi.wps.cn"
             />
@@ -73,10 +115,10 @@ export function SettingsModal({ onClose, onSync }: SettingsModalProps) {
             <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1.5">
               <Key className="w-3.5 h-3.5" /> App ID
             </label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={config.appId}
-              onChange={e => setConfig({...config, appId: e.target.value})}
+              onChange={e => saveConfig({...config, appId: e.target.value})}
               className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
               placeholder="输入 WPS 开放平台 App ID"
             />
@@ -86,10 +128,10 @@ export function SettingsModal({ onClose, onSync }: SettingsModalProps) {
             <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1.5">
               <Key className="w-3.5 h-3.5" /> App Key
             </label>
-            <input 
-              type="password" 
+            <input
+              type="password"
               value={config.appKey}
-              onChange={e => setConfig({...config, appKey: e.target.value})}
+              onChange={e => saveConfig({...config, appKey: e.target.value})}
               className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
               placeholder="输入 WPS 开放平台 App Key"
             />
@@ -99,14 +141,89 @@ export function SettingsModal({ onClose, onSync }: SettingsModalProps) {
             <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1.5">
               <FileSpreadsheet className="w-3.5 h-3.5" /> 在线表格 File ID
             </label>
-            <input 
-              type="text" 
+            <input
+              type="text"
               value={config.fileId}
-              onChange={e => setConfig({...config, fileId: e.target.value})}
+              onChange={e => saveConfig({...config, fileId: e.target.value})}
               className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
               placeholder="输入排产计划表格的 File ID"
             />
           </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
+                <ExternalLink className="w-3.5 h-3.5" /> WPS 授权
+              </label>
+            </div>
+            <a
+              href={getWpsAuthorizationUrl()}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full inline-flex items-center justify-center px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+            >
+              <ExternalLink className="w-4 h-4 mr-2" />
+              开始授权 - 获取 Code
+            </a>
+            <p className="text-xs text-slate-500 mt-2">
+              点击后在 WPS 开放平台完成授权，授权成功后会重定向回来并获取 code，粘贴到下面输入框。
+            </p>
+          </div>
+
+          <div>
+            <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1.5">
+              <KeyRound className="w-3.5 h-3.5" /> 授权 Code
+            </label>
+            <input
+              type="text"
+              value={config.code}
+              onChange={e => saveConfig({...config, code: e.target.value})}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+              placeholder="输入 OAuth 授权后获取的 code"
+            />
+          </div>
+
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleGetToken()}
+              disabled={isGettingToken || !config.code}
+              className="flex-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isGettingToken ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  获取中...
+                </>
+              ) : (
+                <>
+                  <Key className="w-4 h-4" />
+                  获取 Access Token
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => handleRefreshToken()}
+              disabled={isGettingToken}
+              className="flex-1 px-3 py-2 bg-slate-700 hover:bg-slate-600 border border-slate-600 text-slate-200 rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <RefreshCw className="w-4 h-4" />
+              刷新 Access Token
+            </button>
+          </div>
+
+          {tokenStatus === 'success' && (
+            <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 text-sm flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              Access Token 获取/刷新成功
+            </div>
+          )}
+
+          {tokenStatus === 'error' && (
+            <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-400 text-sm flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-rose-500" />
+              Access Token 获取/刷新失败，请检查 code
+            </div>
+          )}
 
           {syncStatus === 'success' && (
             <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 text-sm flex items-center gap-2">

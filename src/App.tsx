@@ -26,6 +26,8 @@ export default function App() {
   const [isAutoScrolling, setIsAutoScrolling] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isGettingToken, setIsGettingToken] = useState(false);
+  const [tokenStatus, setTokenStatus] = useState<'idle' | 'success' | 'error'>('idle');
   
   const currentTime = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
 
@@ -86,6 +88,38 @@ export default function App() {
     config: any
   ): Promise<void> => {
     await syncTasksFromWps();
+  };
+
+  // Get access token with authorization code
+  const handleGetToken = async (code: string): Promise<void> => {
+    setIsGettingToken(true);
+    setTokenStatus('idle');
+    try {
+      await getWpsAccessToken(code);
+      setTokenStatus('success');
+      console.log('Access token obtained successfully');
+    } catch (err) {
+      console.error('Failed to get access token:', err);
+      setTokenStatus('error');
+    } finally {
+      setIsGettingToken(false);
+    }
+  };
+
+  // Refresh access token with refresh token
+  const handleRefreshToken = async (): Promise<void> => {
+    setIsGettingToken(true);
+    setTokenStatus('idle');
+    try {
+      await getWpsAccessToken(); // Uses cached refresh token internally
+      setTokenStatus('success');
+      console.log('Access token refreshed successfully');
+    } catch (err) {
+      console.error('Failed to refresh access token:', err);
+      setTokenStatus('error');
+    } finally {
+      setIsGettingToken(false);
+    }
   };
 
   // Auto sync on app start
@@ -225,7 +259,16 @@ export default function App() {
 
       {selectedTask && <TaskDetailModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
       {previewUrl && <ExcelPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} onSync={handleSyncWPS} />}
+      {showSettings && (
+        <SettingsModal
+          onClose={() => setShowSettings(false)}
+          onSync={handleSyncWPS}
+          onGetToken={handleGetToken}
+          onRefreshToken={handleRefreshToken}
+          tokenStatus={tokenStatus}
+          isGettingToken={isGettingToken}
+        />
+      )}
     </div>
   );
 }
