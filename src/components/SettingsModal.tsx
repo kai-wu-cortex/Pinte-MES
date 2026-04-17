@@ -18,13 +18,32 @@ const loadSavedConfig = () => {
   const saved = localStorage.getItem('wps_config');
   if (saved) {
     try {
-      return JSON.parse(saved);
+      const parsed = JSON.parse(saved);
+      // Ensure all fields exist with defaults
+      return {
+        apiUrl: 'https://openapi.wps.cn',
+        appId: '',
+        appKey: '',
+        fileId: '',
+        worksheetId: 0,
+        rowFrom: 1,
+        rowTo: 1000,
+        colFrom: 1,
+        colTo: 26,
+        code: '',
+        ...parsed,
+      };
     } catch {
       return {
         apiUrl: 'https://openapi.wps.cn',
         appId: '',
         appKey: '',
         fileId: '',
+        worksheetId: 0,
+        rowFrom: 1,
+        rowTo: 1000,
+        colFrom: 1,
+        colTo: 26,
         code: '',
       };
     }
@@ -34,6 +53,11 @@ const loadSavedConfig = () => {
     appId: '',
     appKey: '',
     fileId: '',
+    worksheetId: 0,
+    rowFrom: 1,
+    rowTo: 1000,
+    colFrom: 1,
+    colTo: 26,
     code: '',
   };
 };
@@ -159,6 +183,73 @@ export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tok
           </div>
 
           <div>
+            <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1.5">
+              <FileSpreadsheet className="w-3.5 h-3.5" /> 数据范围 - 工作表 ID
+            </label>
+            <input
+              type="number"
+              value={config.worksheetId ?? 0}
+              onChange={e => saveConfig({...config, worksheetId: parseInt(e.target.value) || 0})}
+              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+              placeholder="工作表 ID，一般第一个工作表是 0"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1.5">
+                起始行 (row_from)
+              </label>
+              <input
+                type="number"
+                value={config.rowFrom ?? 1}
+                onChange={e => saveConfig({...config, rowFrom: parseInt(e.target.value) || 1})}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                placeholder="1"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1.5">
+                结束行 (row_to)
+              </label>
+              <input
+                type="number"
+                value={config.rowTo ?? 1000}
+                onChange={e => saveConfig({...config, rowTo: parseInt(e.target.value) || 1000})}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                placeholder="1000"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1.5">
+                起始列 (col_from)
+              </label>
+              <input
+                type="number"
+                value={config.colFrom ?? 1}
+                onChange={e => saveConfig({...config, colFrom: parseInt(e.target.value) || 1})}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                placeholder="1"
+              />
+            </div>
+            <div>
+              <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1.5">
+                结束列 (col_to)
+              </label>
+              <input
+                type="number"
+                value={config.colTo ?? 26}
+                onChange={e => saveConfig({...config, colTo: parseInt(e.target.value) || 26})}
+                className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
+                placeholder="26"
+              />
+            </div>
+          </div>
+
+          <div>
             <div className="flex items-center justify-between mb-1.5">
               <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5">
                 <ExternalLink className="w-3.5 h-3.5" /> WPS 授权
@@ -241,6 +332,26 @@ export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tok
               </pre>
             </div>
           )}
+
+          <div className="mt-4">
+            <button
+              onClick={handleSync}
+              disabled={isSyncing}
+              className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-sm font-medium transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isSyncing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  同步生产数据...
+                </>
+              ) : (
+                <>
+                  <FileSpreadsheet className="w-4 h-4" />
+                  同步生产数据
+                </>
+              )}
+            </button>
+          </div>
 
           {syncStatus === 'success' && (
             <div className="p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-lg text-emerald-400 text-sm flex items-center gap-2">

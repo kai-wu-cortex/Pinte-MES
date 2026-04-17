@@ -85,12 +85,22 @@ export default function App() {
     appKey: string;
     apiUrl: string;
     fileId: string;
+    worksheetId?: number;
+    rowFrom?: number;
+    rowTo?: number;
+    colFrom?: number;
+    colTo?: number;
   }): Promise<void> => {
     try {
       setIsSyncing(true);
       const token = await getWpsAccessToken(undefined, config);
       const wpsTasks = await fetchTasksFromWps(token, {
         spreadsheetId: config?.fileId,
+        worksheetId: config?.worksheetId,
+        rowFrom: config?.rowFrom,
+        rowTo: config?.rowTo,
+        colFrom: config?.colFrom,
+        colTo: config?.colTo,
         apiBase: config?.apiUrl,
       });
       if (wpsTasks.length > 0) {

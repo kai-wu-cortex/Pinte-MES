@@ -141,13 +141,18 @@ export async function getWpsAccessToken(
 }
 
 /**
- * Fetch all task data from WPS spreadsheet
+ * Fetch all task data from WPS spreadsheet using v7 API
+ * GET /v7/sheets/{file_id}/worksheets/{worksheet_id}/range_data
  */
 export async function fetchTasksFromWps(
   accessToken: string,
   options?: {
     spreadsheetId?: string;
-    range?: string;
+    worksheetId?: number;
+    rowFrom?: number;
+    rowTo?: number;
+    colFrom?: number;
+    colTo?: number;
     apiBase?: string;
   }
 ): Promise<Task[]> {
@@ -156,10 +161,14 @@ export async function fetchTasksFromWps(
     throw new Error('WPS spreadsheet ID not configured');
   }
 
-  // Get range from parameter or use config default
-  const queryRange = options?.range || WPS_CONFIG.defaultRange;
+  const worksheetId = options?.worksheetId ?? 0;
+  const rowFrom = options?.rowFrom ?? 1;
+  const rowTo = options?.rowTo ?? 1000;
+  const colFrom = options?.colFrom ?? 1;
+  const colTo = options?.colTo ?? 26;
   const apiBase = options?.apiBase || WPS_CONFIG.apiBase;
-  const endpoint = `/open/spreadsheet/${spreadsheetId}/values/${encodeURIComponent(queryRange)}`;
+
+  const endpoint = `/v7/sheets/${encodeURIComponent(spreadsheetId)}/worksheets/${worksheetId}/range_data?row_from=${rowFrom}&row_to=${rowTo}&col_from=${colFrom}&col_to=${colTo}`;
 
   const isBrowser = typeof window !== 'undefined';
   let response;
