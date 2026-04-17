@@ -59,7 +59,9 @@ export async function getWpsAccessToken(
   const apiBase = config?.apiUrl || WPS_CONFIG.apiBase;
   const redirectUri = config?.redirectUri || WPS_CONFIG.redirectUri;
 
-  if (!clientId || !clientSecret) {
+  // If we already have a cached refresh token, we don't need to check for clientId/clientSecret
+  // because they were already validated when we got the initial token
+  if (!cachedToken?.refresh_token && (!clientId || !clientSecret)) {
     console.warn('WPS App ID or App Key not configured');
     throw new Error('WPS not configured');
   }
