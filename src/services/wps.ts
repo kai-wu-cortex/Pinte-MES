@@ -7,7 +7,7 @@ const WPS_CONFIG = {
   spreadsheetId: import.meta.env.VITE_WPS_SPREADSHEET_ID || '',
   apiBase: import.meta.env.VITE_WPS_API_BASE || 'https://openapi.wps.cn',
   defaultRange: import.meta.env.VITE_WPS_DEFAULT_RANGE || 'Sheet1!A1:Z1000',
-  redirectUri: (import.meta.env.VITE_WPS_REDIRECT_URI || window.location.origin).replace(/\/$/, ''),
+  redirectUri: import.meta.env.VITE_WPS_REDIRECT_URI || window.location.origin,
 };
 
 export interface WpsAccessTokenResponse {
