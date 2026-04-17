@@ -69,6 +69,26 @@ export async function getWpsAccessToken(
     return cachedToken.access_token;
   }
 
+  const url = `${apiBase}/oauth2/token`;
+  const body = new URLSearchParams();
+
+  if (cachedToken?.refresh_token) {
+    // Use refresh token to get new access token
+    body.append('grant_type', 'refresh_token');
+    body.append('refresh_token', cachedToken.refresh_token);
+    body.append('client_id', clientId);
+    body.append('client_secret', clientSecret);
+  } else if (code) {
+    // Initial authorization with code
+    body.append('grant_type', 'authorization_code');
+    body.append('client_id', clientId);
+    body.append('client_secret', clientSecret);
+    body.append('code', code);
+    body.append('redirect_uri', redirectUri);
+  } else {
+    throw new Error('No authorization code available and no cached refresh token. You need to complete OAuth authorization first.');
+  }
+
   // Use Vercel proxy to avoid CORS issues since WPS API doesn't allow browser cross-origin requests
   const isBrowser = typeof window !== 'undefined';
   let response;
@@ -93,7 +113,7 @@ export async function getWpsAccessToken(
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
       },
-      body,
+      body: body,
     });
   }
 
