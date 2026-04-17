@@ -231,7 +231,8 @@ export function getWpsAuthorizationUrl(
   apiBase: string = WPS_CONFIG.apiBase,
   redirectUri: string = WPS_CONFIG.redirectUri
 ): string {
-  return `${apiBase}/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}`;
+  // According to WPS official docs: endpoint is /oauth2/auth
+  return `${apiBase}/oauth2/auth?client_id=${encodeURIComponent(clientId)}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=kso.user_base.read`;
 }
 
 export { WPS_CONFIG };
