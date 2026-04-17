@@ -28,6 +28,7 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isGettingToken, setIsGettingToken] = useState(false);
   const [tokenStatus, setTokenStatus] = useState<'idle' | 'success' | 'error'>('idle');
+  const [tokenResponse, setTokenResponse] = useState<string>('');
   const [autoCode, setAutoCode] = useState<string | undefined>();
 
   // Extract code from URL search params on mount (for OAuth callback)
@@ -115,16 +116,66 @@ export default function App() {
     appId: string;
     appKey: string;
     apiUrl: string;
+    redirectUri: string;
   }): Promise<void> => {
     setIsGettingToken(true);
     setTokenStatus('idle');
+    setTokenResponse('');
     try {
-      await getWpsAccessToken(code, config);
-      setTokenStatus('success');
-      console.log('Access token obtained successfully');
+      const clientId = config?.appId || (import.meta.env.VITE_WPS_APP_ID || '');
+      const clientSecret = config?.appKey || (import.meta.env.VITE_WPS_APP_KEY || '');
+      const apiBase = config?.apiUrl || (import.meta.env.VITE_WPS_API_BASE || 'https://openapi.wps.cn');
+      const redirectUri = config?.redirectUri || (import.meta.env.VITE_WPS_REDIRECT_URI || (window.location.origin + '/'));
+
+      const body = new URLSearchParams();
+      body.append('grant_type', 'authorization_code');
+      body.append('client_id', clientId);
+      body.append('client_secret', clientSecret);
+      body.append('code', code);
+      body.append('redirect_uri', redirectUri);
+
+      const isBrowser = typeof window !== 'undefined';
+      let response;
+
+      if (isBrowser) {
+        const proxyUrl = '/api/wps-proxy';
+        response = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            endpoint: '/oauth2/token',
+            body: Object.fromEntries(body),
+          }),
+        });
+      } else {
+        const url = `${apiBase}/oauth2/token`;
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body,
+        });
+      }
+
+      const data = await response.json();
+      setTokenResponse(JSON.stringify(data, null, 2));
+
+      if (data.access_token) {
+        // Cache the token in our service
+        await getWpsAccessToken(code, config);
+        setTokenStatus('success');
+        console.log('Access token obtained successfully');
+      } else {
+        setTokenStatus('error');
+        console.error('Failed to get access token:', data);
+      }
     } catch (err) {
       console.error('Failed to get access token:', err);
       setTokenStatus('error');
+      setTokenResponse(JSON.stringify({ error: String(err) }, null, 2));
     } finally {
       setIsGettingToken(false);
     }
@@ -134,13 +185,70 @@ export default function App() {
   const handleRefreshToken = async (): Promise<void> => {
     setIsGettingToken(true);
     setTokenStatus('idle');
+    setTokenResponse('');
     try {
-      await getWpsAccessToken(); // Uses cached refresh token internally
-      setTokenStatus('success');
-      console.log('Access token refreshed successfully');
+      // Access the cached refresh token from our module
+      const cached = await import('../src/services/wps');
+      if (!cached.cachedToken?.refresh_token) {
+        throw new Error('No cached refresh token available');
+      }
+
+      const clientId = (import.meta.env.VITE_WPS_APP_ID || '');
+      const clientSecret = (import.meta.env.VITE_WPS_APP_KEY || '');
+      const apiBase = (import.meta.env.VITE_WPS_API_BASE || 'https://openapi.wps.cn');
+
+      const body = new URLSearchParams();
+      body.append('grant_type', 'refresh_token');
+      body.append('refresh_token', cached.cachedToken.refresh_token);
+      body.append('client_id', clientId);
+      body.append('client_secret', clientSecret);
+
+      const isBrowser = typeof window !== 'undefined';
+      let response;
+
+      if (isBrowser) {
+        const proxyUrl = '/api/wps-proxy';
+        response = await fetch(proxyUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            endpoint: '/oauth2/token',
+            body: Object.fromEntries(body),
+          }),
+        });
+      } else {
+        const url = `${apiBase}/oauth2/token`;
+        response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          body,
+        });
+      }
+
+      const data = await response.json();
+      setTokenResponse(JSON.stringify(data, null, 2));
+
+      if (data.access_token) {
+        // Update the cached token in the module
+        (cached as any).cachedToken = {
+          access_token: data.access_token,
+          refresh_token: data.refresh_token,
+          expiresAt: Date.now() + (data.expires_in * 1000),
+        };
+        setTokenStatus('success');
+        console.log('Access token refreshed successfully');
+      } else {
+        setTokenStatus('error');
+        console.error('Failed to refresh access token:', data);
+      }
     } catch (err) {
       console.error('Failed to refresh access token:', err);
       setTokenStatus('error');
+      setTokenResponse(JSON.stringify({ error: String(err) }, null, 2));
     } finally {
       setIsGettingToken(false);
     }
@@ -292,6 +400,7 @@ export default function App() {
           tokenStatus={tokenStatus}
           isGettingToken={isGettingToken}
           initialCode={autoCode}
+          tokenResponse={tokenResponse}
         />
       )}
     </div>

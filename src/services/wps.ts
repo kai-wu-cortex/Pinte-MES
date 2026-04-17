@@ -19,7 +19,7 @@ export interface WpsAccessTokenResponse {
 }
 
 // Cached access token with expiration
-let cachedToken: {
+export let cachedToken: {
   access_token: string;
   refresh_token: string;
   expiresAt: number;
