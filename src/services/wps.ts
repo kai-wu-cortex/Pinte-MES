@@ -36,6 +36,13 @@ export interface WpsSpreadsheetRangeResponse {
   values: string[][];
 }
 
+export interface WpsClientConfig {
+  appId: string;
+  appKey: string;
+  apiUrl: string;
+  redirectUri: string;
+}
+
 /**
  * Get WPS access token (with caching and refresh support)
  *
@@ -43,8 +50,16 @@ export interface WpsSpreadsheetRangeResponse {
  * If we have a cached token that's still valid, reuse it.
  * If expired, use refresh token to get a new one.
  */
-export async function getWpsAccessToken(code?: string): Promise<string> {
-  if (!WPS_CONFIG.appId || !WPS_CONFIG.appKey) {
+export async function getWpsAccessToken(
+  code?: string,
+  config?: Partial<WpsClientConfig>
+): Promise<string> {
+  const clientId = config?.appId || WPS_CONFIG.appId;
+  const clientSecret = config?.appKey || WPS_CONFIG.appKey;
+  const apiBase = config?.apiUrl || WPS_CONFIG.apiBase;
+  const redirectUri = config?.redirectUri || WPS_CONFIG.redirectUri;
+
+  if (!clientId || !clientSecret) {
     console.warn('WPS App ID or App Key not configured');
     throw new Error('WPS not configured');
   }
@@ -54,22 +69,22 @@ export async function getWpsAccessToken(code?: string): Promise<string> {
     return cachedToken.access_token;
   }
 
-  const url = `${WPS_CONFIG.apiBase}/oauth2/token`;
+  const url = `${apiBase}/oauth2/token`;
   const body = new URLSearchParams();
 
   if (cachedToken?.refresh_token) {
     // Use refresh token to get new access token
     body.append('grant_type', 'refresh_token');
     body.append('refresh_token', cachedToken.refresh_token);
-    body.append('client_id', WPS_CONFIG.appId);
-    body.append('client_secret', WPS_CONFIG.appKey);
+    body.append('client_id', clientId);
+    body.append('client_secret', clientSecret);
   } else if (code) {
     // Initial authorization with code
     body.append('grant_type', 'authorization_code');
-    body.append('client_id', WPS_CONFIG.appId);
-    body.append('client_secret', WPS_CONFIG.appKey);
+    body.append('client_id', clientId);
+    body.append('client_secret', clientSecret);
     body.append('code', code);
-    body.append('redirect_uri', WPS_CONFIG.redirectUri);
+    body.append('redirect_uri', redirectUri);
   } else {
     throw new Error('No authorization code available and no cached refresh token. You need to complete OAuth authorization first.');
   }
@@ -108,16 +123,21 @@ export async function getWpsAccessToken(code?: string): Promise<string> {
  */
 export async function fetchTasksFromWps(
   accessToken: string,
-  range?: string
+  options?: {
+    spreadsheetId?: string;
+    range?: string;
+    apiBase?: string;
+  }
 ): Promise<Task[]> {
-  const spreadsheetId = WPS_CONFIG.spreadsheetId;
+  const spreadsheetId = options?.spreadsheetId || WPS_CONFIG.spreadsheetId;
   if (!spreadsheetId) {
     throw new Error('WPS spreadsheet ID not configured');
   }
 
   // Get range from parameter or use config default
-  const queryRange = range || WPS_CONFIG.defaultRange;
-  const url = `${WPS_CONFIG.apiBase}/open/spreadsheet/${spreadsheetId}/values/${encodeURIComponent(queryRange)}`;
+  const queryRange = options?.range || WPS_CONFIG.defaultRange;
+  const apiBase = options?.apiBase || WPS_CONFIG.apiBase;
+  const url = `${apiBase}/open/spreadsheet/${spreadsheetId}/values/${encodeURIComponent(queryRange)}`;
 
   const response = await fetch(url, {
     headers: {
@@ -206,9 +226,12 @@ function convertWpsRowToTask(row: string[], index: number): Task {
  * Get the WPS OAuth authorization URL
  * Users visit this URL to grant access to the application
  */
-export function getWpsAuthorizationUrl(): string {
-  const redirectUri = WPS_CONFIG.redirectUri;
-  return `${WPS_CONFIG.apiBase}/oauth/authorize?client_id=${WPS_CONFIG.appId}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}`;
+export function getWpsAuthorizationUrl(
+  clientId: string = WPS_CONFIG.appId,
+  apiBase: string = WPS_CONFIG.apiBase,
+  redirectUri: string = WPS_CONFIG.redirectUri
+): string {
+  return `${apiBase}/oauth/authorize?client_id=${encodeURIComponent(clientId)}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}`;
 }
 
 export { WPS_CONFIG };

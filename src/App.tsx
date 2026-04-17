@@ -64,11 +64,19 @@ export default function App() {
   };
 
   // Common sync logic from WPS
-  const syncTasksFromWps = async (): Promise<void> => {
+  const syncTasksFromWps = async (config?: {
+    appId: string;
+    appKey: string;
+    apiUrl: string;
+    fileId: string;
+  }): Promise<void> => {
     try {
       setIsSyncing(true);
-      const token = await getWpsAccessToken();
-      const wpsTasks = await fetchTasksFromWps(token);
+      const token = await getWpsAccessToken(undefined, config);
+      const wpsTasks = await fetchTasksFromWps(token, {
+        spreadsheetId: config?.fileId,
+        apiBase: config?.apiUrl,
+      });
       if (wpsTasks.length > 0) {
         setTasks(wpsTasks);
         console.log(`Synced ${wpsTasks.length} tasks from WPS`);
@@ -83,19 +91,20 @@ export default function App() {
     }
   };
 
-  const handleSyncWPS = async (
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    config: any
-  ): Promise<void> => {
-    await syncTasksFromWps();
+  const handleSyncWPS = async (config: any): Promise<void> => {
+    await syncTasksFromWps(config);
   };
 
   // Get access token with authorization code
-  const handleGetToken = async (code: string): Promise<void> => {
+  const handleGetToken = async (code: string, config?: {
+    appId: string;
+    appKey: string;
+    apiUrl: string;
+  }): Promise<void> => {
     setIsGettingToken(true);
     setTokenStatus('idle');
     try {
-      await getWpsAccessToken(code);
+      await getWpsAccessToken(code, config);
       setTokenStatus('success');
       console.log('Access token obtained successfully');
     } catch (err) {
