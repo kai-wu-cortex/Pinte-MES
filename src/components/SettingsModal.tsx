@@ -157,7 +157,7 @@ export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tok
               </label>
             </div>
             <a
-              href={getWpsAuthorizationUrl(config.appId, config.apiUrl, window.location.origin)}
+              href={getWpsAuthorizationUrl(config.appId, config.apiUrl, window.location.origin + '/')}
               target="_blank"
               rel="noopener noreferrer"
               className="w-full inline-flex items-center justify-center px-3 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
