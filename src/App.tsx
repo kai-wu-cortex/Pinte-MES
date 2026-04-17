@@ -28,7 +28,22 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const [isGettingToken, setIsGettingToken] = useState(false);
   const [tokenStatus, setTokenStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  
+  const [autoCode, setAutoCode] = useState<string | undefined>();
+
+  // Extract code from URL search params on mount (for OAuth callback)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (code) {
+      setAutoCode(code);
+      // Open settings modal automatically when code is present in URL
+      setShowSettings(true);
+      // Clean up URL to remove code parameter
+      const newUrl = window.location.origin + window.location.pathname;
+      window.history.replaceState({}, document.title, newUrl);
+    }
+  }, []);
+
   const currentTime = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
 
   const metrics = useMemo(() => {
@@ -276,6 +291,7 @@ export default function App() {
           onRefreshToken={handleRefreshToken}
           tokenStatus={tokenStatus}
           isGettingToken={isGettingToken}
+          initialCode={autoCode}
         />
       )}
     </div>

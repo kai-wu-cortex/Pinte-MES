@@ -9,6 +9,7 @@ interface SettingsModalProps {
   onRefreshToken: () => Promise<void>;
   tokenStatus: 'idle' | 'success' | 'error';
   isGettingToken: boolean;
+  initialCode?: string;
 }
 
 // Load saved config from localStorage on initialization
@@ -36,10 +37,16 @@ const loadSavedConfig = () => {
   };
 };
 
-export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tokenStatus, isGettingToken }: SettingsModalProps) {
+export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tokenStatus, isGettingToken, initialCode }: SettingsModalProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [config, setConfig] = useState(loadSavedConfig());
+  const [config, setConfig] = useState(() => {
+    const saved = loadSavedConfig();
+    if (initialCode && initialCode.trim()) {
+      return { ...saved, code: initialCode };
+    }
+    return saved;
+  });
 
   // Save config to localStorage when it changes
   const saveConfig = (newConfig: typeof config) => {

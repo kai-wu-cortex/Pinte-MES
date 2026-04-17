@@ -69,33 +69,33 @@ export async function getWpsAccessToken(
     return cachedToken.access_token;
   }
 
-  const url = `${apiBase}/oauth2/token`;
-  const body = new URLSearchParams();
+  // Use Vercel proxy to avoid CORS issues since WPS API doesn't allow browser cross-origin requests
+  const isBrowser = typeof window !== 'undefined';
+  let response;
 
-  if (cachedToken?.refresh_token) {
-    // Use refresh token to get new access token
-    body.append('grant_type', 'refresh_token');
-    body.append('refresh_token', cachedToken.refresh_token);
-    body.append('client_id', clientId);
-    body.append('client_secret', clientSecret);
-  } else if (code) {
-    // Initial authorization with code
-    body.append('grant_type', 'authorization_code');
-    body.append('client_id', clientId);
-    body.append('client_secret', clientSecret);
-    body.append('code', code);
-    body.append('redirect_uri', redirectUri);
+  if (isBrowser) {
+    // Browser: use our Vercel proxy
+    const proxyUrl = '/api/wps-proxy';
+    response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        endpoint: '/oauth2/token',
+        body: Object.fromEntries(body),
+      }),
+    });
   } else {
-    throw new Error('No authorization code available and no cached refresh token. You need to complete OAuth authorization first.');
+    // Node/SSR: direct request
+    response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
+    });
   }
-
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded',
-    },
-    body,
-  });
 
   if (!response.ok) {
     const error = await response.json() as { code: number; msg: string };
@@ -137,13 +137,35 @@ export async function fetchTasksFromWps(
   // Get range from parameter or use config default
   const queryRange = options?.range || WPS_CONFIG.defaultRange;
   const apiBase = options?.apiBase || WPS_CONFIG.apiBase;
-  const url = `${apiBase}/open/spreadsheet/${spreadsheetId}/values/${encodeURIComponent(queryRange)}`;
+  const endpoint = `/open/spreadsheet/${spreadsheetId}/values/${encodeURIComponent(queryRange)}`;
 
-  const response = await fetch(url, {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-    },
-  });
+  const isBrowser = typeof window !== 'undefined';
+  let response;
+
+  if (isBrowser) {
+    // Browser: use our Vercel proxy with GET converted to POST through proxy
+    const proxyUrl = '/api/wps-proxy';
+    response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        endpoint,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }),
+    });
+  } else {
+    // Node/SSR: direct request
+    const url = `${apiBase}${endpoint}`;
+    response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+  }
 
   if (!response.ok) {
     throw new Error(`Failed to fetch spreadsheet: ${response.statusText}`);
