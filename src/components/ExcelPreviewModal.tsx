@@ -196,7 +196,9 @@ export function ExcelPreviewModal({ task, mainFileId, onClose }: ExcelPreviewMod
     };
   }, [task, mainFileId]);
 
-  const url = task?.fileUrl || targetFileId;
+  const externalUrl = task?.fileUrl && task.fileUrl.startsWith('http')
+    ? task.fileUrl
+    : (task?.fileUrl ? `https://open.wps.cn/docs/file/${task.fileUrl}` : '');
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
@@ -204,13 +206,15 @@ export function ExcelPreviewModal({ task, mainFileId, onClose }: ExcelPreviewMod
         <div className="flex items-center justify-between px-6 py-4 border-b border-blue-900/50">
           <h2 className="text-lg font-semibold text-white">电子流程卡</h2>
           <div className="flex items-center gap-2">
-            <button
-              onClick={() => window.open(`https://open.wps.cn/view/${url}`, '_blank')}
-              className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
-              title="Open in new tab"
-            >
-              <ExternalLink className="w-5 h-5" />
-            </button>
+            {externalUrl && (
+              <button
+                onClick={() => window.open(externalUrl, '_blank')}
+                className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
+                title="Open in new tab"
+              >
+                <ExternalLink className="w-5 h-5" />
+              </button>
+            )}
             <button
               onClick={onClose}
               className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
