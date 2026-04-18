@@ -171,10 +171,10 @@ export async function fetchTasksFromWps(
   }
 
   const worksheetId = options?.worksheetId ?? 1;
-  const rowFrom = options?.rowFrom ?? 1;
-  const rowTo = options?.rowTo ?? 1000;
-  const colFrom = options?.colFrom ?? 1;
-  const colTo = options?.colTo ?? 26;
+  const rowFrom = options?.rowFrom ?? 0;
+  const rowTo = options?.rowTo ?? 9999;
+  const colFrom = options?.colFrom ?? 0;
+  const colTo = options?.colTo ?? 10;
   const apiBase = options?.apiBase || WPS_CONFIG.apiBase;
 
   // API path requires: /v7/sheets/{file_id}/worksheets/{worksheet_id}/range_data
