@@ -1,9 +1,8 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import { Task } from '../types';
 import { cn } from './MetricCard';
 import { Columns, Rows, Check, ListTree, ChevronDown, ChevronRight, GripVertical, FilterX, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
-import { useAutoScroll } from '../hooks/useAutoScroll';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -54,7 +53,6 @@ interface TableViewProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
   onProcessCardClick: (url: string) => void;
-  isAutoScrolling?: boolean;
 }
 
 type Spacing = 'compact' | 'normal' | 'relaxed';
@@ -78,8 +76,7 @@ const COLUMNS = [
   { id: 'notes', label: '工艺备注', defaultWidth: 200, groupable: true },
 ];
 
-export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScrolling = false }: TableViewProps) {
-  const scrollRef = useAutoScroll(isAutoScrolling);
+export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewProps) {
   const [spacing, setSpacing] = useLocalStorage<Spacing>('mes_table_spacing', 'compact');
   const [columnOrder, setColumnOrder] = useLocalStorage<string[]>('mes_table_columnOrder', COLUMNS.map(c => c.id));
   const [visibleColsArr, setVisibleColsArr] = useLocalStorage<string[]>('mes_table_visibleCols', COLUMNS.map(c => c.id));
@@ -169,16 +166,22 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
     localStorage.setItem('mes_table_col_widths', JSON.stringify(colWidths));
   }, [colWidths]);
 
+  // Keep a ref to latest colWidths for drag handlers to avoid closure issues
+  const colWidthsRef = useRef(colWidths);
+  colWidthsRef.current = colWidths;
+
   const handleResizeStart = (e: React.MouseEvent, colId: string) => {
     e.preventDefault();
     e.stopPropagation();
 
     const startX = e.clientX;
-    const startWidth = colWidths[colId] || 100;
+    const startWidth = colWidthsRef.current[colId] || 100;
 
-    // Prevent text selection during drag
+    // Prevent text selection during drag - this fixes the left drag jumping bug
     const originalUserSelect = document.body.style.userSelect;
+    const originalPointerEvents = document.body.style.pointerEvents;
     document.body.style.userSelect = 'none';
+    document.body.style.pointerEvents = 'none';
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
       moveEvent.preventDefault();
@@ -188,8 +191,9 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
     };
 
     const handleMouseUp = () => {
-      // Restore text selection
+      // Restore styles
       document.body.style.userSelect = originalUserSelect;
+      document.body.style.pointerEvents = originalPointerEvents;
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
@@ -412,7 +416,7 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
       </div>
 
       {/* Table Container */}
-      <div className="flex-1 overflow-auto relative" ref={scrollRef}>
+      <div className="flex-1 overflow-auto relative">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={orderedColumns.map(c => c.id)} strategy={horizontalListSortingStrategy}>
             <table className="w-full text-left text-slate-300 min-w-max">

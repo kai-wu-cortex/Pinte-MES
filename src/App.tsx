@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import { MetricCard } from './components/MetricCard';
 import { INITIAL_TASKS, MACHINES } from './data';
 import { fetchTasksFromWps, getWpsAccessToken } from './services/wps';
-import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Play, Square, Search, Loader2 } from 'lucide-react';
+import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Search, Loader2 } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { cn } from './components/MetricCard';
 import { AnimatePresence, motion } from 'motion/react';
@@ -25,7 +25,6 @@ export default function App() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
-  const [isAutoScrolling, setIsAutoScrolling] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isGettingToken, setIsGettingToken] = useState(false);
@@ -271,21 +270,7 @@ export default function App() {
             </div>
           )}
 
-          <button 
-            onClick={() => setIsAutoScrolling(!isAutoScrolling)}
-            className={cn(
-              "p-2 rounded-lg transition-colors border flex items-center gap-2 text-sm font-medium",
-              isAutoScrolling 
-                ? "bg-blue-600/20 text-blue-400 border-blue-500/50 shadow-[0_0_10px_rgba(37,99,235,0.3)]" 
-                : "text-slate-400 hover:text-white hover:bg-slate-800 border-transparent hover:border-slate-700"
-            )}
-            title="自动滚动屏幕"
-          >
-            {isAutoScrolling ? <Square className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-            {isAutoScrolling ? '停止滚动' : '自动滚动'}
-          </button>
-
-          <button 
+          <button
             onClick={() => setShowSettings(true)}
             className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700"
             title="数据源配置"
@@ -313,9 +298,9 @@ export default function App() {
               className="h-full"
             >
               <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-blue-400" /></div>}>
-                {viewMode === 'table' && <TableView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} isAutoScrolling={isAutoScrolling} />}
-                {viewMode === 'calendar' && <CalendarView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} isAutoScrolling={isAutoScrolling} />}
-                {viewMode === 'task' && <TaskView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} isAutoScrolling={isAutoScrolling} />}
+                {viewMode === 'table' && <TableView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
+                {viewMode === 'calendar' && <CalendarView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
+                {viewMode === 'task' && <TaskView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
               </Suspense>
             </motion.div>
           </AnimatePresence>

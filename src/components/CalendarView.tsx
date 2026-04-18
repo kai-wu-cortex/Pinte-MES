@@ -4,14 +4,12 @@ import { format, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfM
 import { zhCN } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, Check, Settings2, FilterX } from 'lucide-react';
 import { cn } from './MetricCard';
-import { useAutoScroll } from '../hooks/useAutoScroll';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 interface CalendarViewProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
   onProcessCardClick: (url: string) => void;
-  isAutoScrolling?: boolean;
 }
 
 type FilterOperator = 'contains' | 'notContains' | 'equals' | 'notEquals' | 'startsWith' | 'endsWith' | 'isEmpty' | 'isNotEmpty';
@@ -64,8 +62,7 @@ const CALENDAR_FIELDS = [
   { id: 'notes', label: '工艺备注' },
 ];
 
-export function CalendarView({ tasks, onTaskClick, onProcessCardClick, isAutoScrolling = false }: CalendarViewProps) {
-  const scrollRef = useAutoScroll(isAutoScrolling);
+export function CalendarView({ tasks, onTaskClick, onProcessCardClick }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useLocalStorage<'month' | 'week'>('mes_calendar_viewType', 'month');
   const [visibleFieldsArr, setVisibleFieldsArr] = useLocalStorage<string[]>('mes_calendar_visibleFields', ['id', 'productName', 'machineName']);
@@ -297,7 +294,7 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick, isAutoScr
       </div>
 
       {/* Calendar Grid */}
-      <div className="flex-1 overflow-auto" ref={scrollRef}>
+      <div className="flex-1 overflow-auto">
         <div className="min-w-[800px] h-full flex flex-col">
           {/* Days Header */}
           <div className="grid grid-cols-7 border-b border-blue-900/50 bg-slate-800/80 shrink-0">

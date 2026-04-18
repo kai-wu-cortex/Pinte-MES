@@ -3,7 +3,6 @@ import { Task } from '../types';
 import { cn } from './MetricCard';
 import { format } from 'date-fns';
 import { Clock, User, Settings, FileText, LayoutGrid, Settings2, Check, Hash, Box, Activity, ListTree, FilterX } from 'lucide-react';
-import { useAutoScroll } from '../hooks/useAutoScroll';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 type FilterOperator = 'contains' | 'notContains' | 'equals' | 'notEquals' | 'startsWith' | 'endsWith' | 'isEmpty' | 'isNotEmpty';
@@ -51,7 +50,6 @@ interface TaskViewProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
   onProcessCardClick: (url: string) => void;
-  isAutoScrolling?: boolean;
 }
 
 const TASK_FIELDS = [
@@ -150,8 +148,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onProcessCardClick, 
   );
 }
 
-export function TaskView({ tasks, onTaskClick, onProcessCardClick, isAutoScrolling = false }: TaskViewProps) {
-  const scrollRef = useAutoScroll(isAutoScrolling);
+export function TaskView({ tasks, onTaskClick, onProcessCardClick }: TaskViewProps) {
   const [cardSize, setCardSize] = useLocalStorage<'sm' | 'md' | 'lg'>('mes_task_cardSize', 'md');
   const [visibleFieldsArr, setVisibleFieldsArr] = useLocalStorage<string[]>('mes_task_visibleFields', ['id', 'productName', 'machineName', 'operator', 'time']);
   const [groupBy, setGroupBy] = useLocalStorage<string>('mes_task_groupBy', 'none');
@@ -426,7 +423,7 @@ export function TaskView({ tasks, onTaskClick, onProcessCardClick, isAutoScrolli
   return (
     <div className="flex flex-col h-full bg-slate-900/40 rounded-xl border border-blue-900/30 overflow-hidden">
       <Toolbar />
-      <div className="flex-1 overflow-y-auto p-4" ref={scrollRef}>
+      <div className="flex-1 overflow-y-auto p-4">
         <div className="space-y-6">
           {Object.entries(groupedTasks as Record<string, Task[]>).map(([groupName, groupTasks]) => (
             <div key={groupName} className="space-y-3">
