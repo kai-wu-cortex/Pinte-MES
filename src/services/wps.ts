@@ -265,17 +265,17 @@ export async function fetchTasksFromWps(
  * Expected columns (adjust based on actual spreadsheet):
  * 0: machineName (机台)
  * 1: id (流程卡号)
- * 2: fileUrl (电子流程卡 - WPS文件ID)
- * 3: productName (品名颜色)
- * 4: specification (规格)
- * 5: plannedQuantity (预计数量/m)
- * 6: actualOutput (实际产出)
- * 7: slittingQuantity (分切数量)
- * 8: shippedQuantity (实际出货数量)
- * 9: notes (备注)
+ * 2: process (工艺)
+ * 3: fileUrl (电子流程卡 - WPS文件ID)
+ * 4: productName (品名颜色)
+ * 5: specification (规格)
+ * 6: plannedQuantity (预计数量/m)
+ * 7: actualOutput (实际产出)
+ * 8: slittingQuantity (分切数量)
+ * 9: shippedQuantity (实际出货数量)
+ * 10: notes (备注)
  *
  * Missing columns get default values:
- * process: empty string
  * startTime/endTime: current date
  * operator: empty string
  */
@@ -283,6 +283,7 @@ function convertWpsRowToTask(row: string[], index: number): Task {
   const [
     machineName = '',
     id = `TC-${Date.now() + index}`,
+    process = '',
     fileUrl = '',
     productName = '',
     specification = '',
@@ -300,7 +301,6 @@ function convertWpsRowToTask(row: string[], index: number): Task {
   const resolvedMachineName = machine?.name || trimmedMachineName;
 
   // Defaults for missing columns
-  const process_ = '';
   const startTime = '';
   const endTime = '';
   const operator = '';
@@ -320,7 +320,7 @@ function convertWpsRowToTask(row: string[], index: number): Task {
 
   return {
     id: (id || '').trim() || `TC-${Date.now() + index}`,
-    process: (process_ || '').trim(),
+    process: (process || '').trim(),
     machineId,
     machineName: resolvedMachineName,
     productName: (productName || '').trim(),
