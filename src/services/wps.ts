@@ -263,37 +263,34 @@ export async function fetchTasksFromWps(
 /**
  * Convert WPS spreadsheet row to application Task type
  * Expected columns (adjust based on actual spreadsheet):
- * 0: id (流程卡号)
- * 1: process (工艺)
- * 2: machineName (机台)
+ * 0: machineName (机台)
+ * 1: id (流程卡号)
+ * 2: fileUrl (电子流程卡 - WPS文件ID)
  * 3: productName (品名颜色)
  * 4: specification (规格)
- * 5: plannedQuantity (预计数量)
+ * 5: plannedQuantity (预计数量/m)
  * 6: actualOutput (实际产出)
  * 7: slittingQuantity (分切数量)
- * 8: shippedQuantity (出货数量)
- * 9: startTime (开始时间)
- * 10: endTime (结束时间)
- * 11: operator (操作员)
- * 12: notes (备注)
- * 13: fileUrl/fileId (WPS文件ID)
+ * 8: shippedQuantity (实际出货数量)
+ * 9: notes (备注)
+ *
+ * Missing columns get default values:
+ * process: empty string
+ * startTime/endTime: current date
+ * operator: empty string
  */
 function convertWpsRowToTask(row: string[], index: number): Task {
   const [
-    id = `TC-${Date.now() + index}`,
-    process = '',
     machineName = '',
+    id = `TC-${Date.now() + index}`,
+    fileUrl = '',
     productName = '',
     specification = '',
     plannedQuantity = '0',
     actualOutput = '0',
     slittingQuantity = '0',
     shippedQuantity = '0',
-    startTime = new Date().toISOString(),
-    endTime = new Date().toISOString(),
-    operator = '',
     notes = '',
-    fileUrl = '',
   ] = row;
 
   // Get machineId from machineName by looking up in MACHINES list
@@ -301,6 +298,12 @@ function convertWpsRowToTask(row: string[], index: number): Task {
   const machine = MACHINES.find(m => m.name === trimmedMachineName);
   const machineId = machine?.id || `M-${Date.now() + index}`;
   const resolvedMachineName = machine?.name || trimmedMachineName;
+
+  // Defaults for missing columns
+  const process_ = '';
+  const startTime = '';
+  const endTime = '';
+  const operator = '';
 
   // Safe date parsing - handle invalid dates gracefully
   const parseDate = (dateStr: string): string => {
@@ -317,7 +320,7 @@ function convertWpsRowToTask(row: string[], index: number): Task {
 
   return {
     id: (id || '').trim() || `TC-${Date.now() + index}`,
-    process: (process || '').trim(),
+    process: (process_ || '').trim(),
     machineId,
     machineName: resolvedMachineName,
     productName: (productName || '').trim(),
