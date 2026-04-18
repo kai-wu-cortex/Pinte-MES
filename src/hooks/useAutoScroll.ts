@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react';
 
-export function useAutoScroll(isActive: boolean, speed = 0.5) {
+export function useAutoScroll(isActive: boolean, speed = 2) {
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
