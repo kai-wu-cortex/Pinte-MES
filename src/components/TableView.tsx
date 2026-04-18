@@ -488,7 +488,7 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
           </SortableContext>
         </DndContext>
         {/* Pagination Controls */}
-        {pageSize !== 'all' && totalPages > 1 && (
+        {pageSize !== 'all' && (
           <div className="sticky bottom-0 bg-slate-800/90 border-t border-blue-900/50 px-4 py-3 flex items-center justify-between mt-2 backdrop-blur-md">
             <div className="text-xs text-slate-400">
               显示 {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalFilteredRows)} 共 {totalFilteredRows} 条

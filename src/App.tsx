@@ -26,6 +26,7 @@ export default function App() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [filterToday, setFilterToday] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isGettingToken, setIsGettingToken] = useState(false);
   const [tokenStatus, setTokenStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -71,8 +72,11 @@ export default function App() {
         t.process.toLowerCase().includes(q)
       );
     }
+    if (filterToday) {
+      filtered = filtered.filter(t => isSameDay(new Date(t.startTime), new Date()));
+    }
     return filtered;
-  }, [tasks, searchQuery]);
+  }, [tasks, searchQuery, filterToday]);
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
@@ -282,9 +286,29 @@ export default function App() {
 
       <main className="flex-1 p-6 flex flex-col gap-6 overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
-          <MetricCard title="所有生产单" value={metrics.totalOrders} icon={<LayoutDashboard className="w-5 h-5" />} />
-          <MetricCard title="当日计划生产数" value={metrics.todayCount} icon={<Activity className="w-5 h-5" />} className="border-blue-500/30" />
-          <MetricCard title="当日计划生产量" value={`${metrics.todayVolume} m`} icon={<CheckCircle2 className="w-5 h-5" />} className="border-emerald-500/30" />
+          <MetricCard
+            title="所有生产单"
+            value={metrics.totalOrders}
+            icon={<LayoutDashboard className="w-5 h-5" />}
+            onClick={() => setFilterToday(false)}
+            active={!filterToday}
+          />
+          <MetricCard
+            title="当日计划生产数"
+            value={metrics.todayCount}
+            icon={<Activity className="w-5 h-5" />}
+            className="border-blue-500/30"
+            onClick={() => setFilterToday(true)}
+            active={filterToday}
+          />
+          <MetricCard
+            title="当日计划生产量"
+            value={`${metrics.todayVolume} m`}
+            icon={<CheckCircle2 className="w-5 h-5" />}
+            className="border-emerald-500/30"
+            onClick={() => setFilterToday(true)}
+            active={filterToday}
+          />
         </div>
 
         <div className="flex-1 min-h-0 overflow-auto bg-slate-900/20 rounded-xl border border-blue-900/30 p-4 shadow-inner relative">
