@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import { MetricCard } from './components/MetricCard';
 import { INITIAL_TASKS, MACHINES } from './data';
 import { fetchTasksFromWps, getWpsAccessToken } from './services/wps';
-import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Play, Square, Search, Loader2, Filter } from 'lucide-react';
+import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Play, Square, Search, Loader2 } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { cn } from './components/MetricCard';
 import { AnimatePresence, motion } from 'motion/react';
@@ -27,7 +27,6 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(false);
   const [isAutoScrolling, setIsAutoScrolling] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedMachine, setSelectedMachine] = useLocalStorage<string>('mes_selectedMachine', '');
   const [isSyncing, setIsSyncing] = useState(false);
   const [isGettingToken, setIsGettingToken] = useState(false);
   const [tokenStatus, setTokenStatus] = useState<'idle' | 'success' | 'error'>('idle');
@@ -73,11 +72,8 @@ export default function App() {
         t.process.toLowerCase().includes(q)
       );
     }
-    if (selectedMachine) {
-      filtered = filtered.filter(t => t.machineId === selectedMachine);
-    }
     return filtered;
-  }, [tasks, searchQuery, selectedMachine]);
+  }, [tasks, searchQuery]);
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
@@ -228,20 +224,6 @@ export default function App() {
               onChange={(e) => setSearchQuery(e.target.value)}
               className="bg-slate-950 border border-blue-900/50 rounded-lg py-1.5 pl-9 pr-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500 w-48"
             />
-          </div>
-
-          <div className="relative">
-            <Filter className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-            <select
-              value={selectedMachine}
-              onChange={(e) => setSelectedMachine(e.target.value)}
-              className="bg-slate-950 border border-blue-900/50 rounded-lg py-1.5 pl-9 pr-3 text-sm text-slate-200 focus:outline-none focus:border-blue-500 w-40 appearance-none"
-            >
-              <option value="">全部机台</option>
-              {MACHINES.map(machine => (
-                <option key={machine.id} value={machine.id}>{machine.name}</option>
-              ))}
-            </select>
           </div>
 
           <div className="flex bg-slate-950 rounded-lg p-1 border border-blue-900/50">

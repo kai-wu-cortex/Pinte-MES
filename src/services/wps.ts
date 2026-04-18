@@ -249,13 +249,13 @@ export async function fetchTasksFromWps(
   const sortedRowKeys = Object.keys(rowsMap).map(Number).sort((a, b) => a - b);
   const rows: string[][] = sortedRowKeys.map(key => rowsMap[key]);
 
-  if (rows.length <= 1) {
-    // No data or only header row
+  if (rows.length <= 2) {
+    // No data or only title + header rows
     return { tasks: [], rawData: fullResponse };
   }
 
-  // Assume first row is header, skip it
-  const dataRows = rows.slice(1);
+  // First row = title (merged cell), second row = header, skip both, data starts from third row
+  const dataRows = rows.slice(2);
   const tasks = dataRows.map((row, index) => convertWpsRowToTask(row, index));
   return { tasks, rawData: fullResponse };
 }
