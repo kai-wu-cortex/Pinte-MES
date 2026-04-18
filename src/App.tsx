@@ -94,7 +94,7 @@ export default function App() {
     try {
       setIsSyncing(true);
       const token = await getWpsAccessToken(undefined, config);
-      const wpsTasks = await fetchTasksFromWps(token, {
+      const wpsTasks = await fetchTasksFromWps(token.access_token, {
         spreadsheetId: config?.fileId,
         worksheetId: config?.worksheetId,
         rowFrom: config?.rowFrom,

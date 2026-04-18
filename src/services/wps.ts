@@ -43,6 +43,9 @@ export interface WpsClientConfig {
   redirectUri: string;
 }
 
+export interface WpsTokenResponse extends WpsAccessTokenResponse {
+}
+
 /**
  * Get WPS access token (with caching and refresh support)
  *
@@ -53,7 +56,7 @@ export interface WpsClientConfig {
 export async function getWpsAccessToken(
   code?: string,
   config?: Partial<WpsClientConfig>
-): Promise<string> {
+): Promise<WpsTokenResponse> {
   const clientId = config?.appId || WPS_CONFIG.appId;
   const clientSecret = config?.appKey || WPS_CONFIG.appKey;
   const apiBase = config?.apiUrl || WPS_CONFIG.apiBase;
@@ -68,7 +71,13 @@ export async function getWpsAccessToken(
 
   // Return cached token if it's still valid (5 min buffer before expiration)
   if (cachedToken && Date.now() < cachedToken.expiresAt - 300000) {
-    return cachedToken.access_token;
+    return {
+      access_token: cachedToken.access_token,
+      refresh_token: cachedToken.refresh_token,
+      expires_in: Math.floor((cachedToken.expiresAt - Date.now()) / 1000),
+      refresh_expires_in: 0,
+      token_type: 'bearer',
+    };
   }
 
   const url = `${apiBase}/oauth2/token`;
@@ -137,7 +146,7 @@ export async function getWpsAccessToken(
     expiresAt: Date.now() + (data.expires_in * 1000),
   };
 
-  return data.access_token;
+  return data;
 }
 
 /**
