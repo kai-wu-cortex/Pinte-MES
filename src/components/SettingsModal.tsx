@@ -11,6 +11,7 @@ interface SettingsModalProps {
   isGettingToken: boolean;
   initialCode?: string;
   tokenResponse?: string;
+  syncResponse?: string;
 }
 
 // Load saved config from localStorage on initialization
@@ -62,7 +63,7 @@ const loadSavedConfig = () => {
   };
 };
 
-export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tokenStatus, isGettingToken, initialCode, tokenResponse }: SettingsModalProps) {
+export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tokenStatus, isGettingToken, initialCode, tokenResponse, syncResponse }: SettingsModalProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [config, setConfig] = useState(() => {
@@ -364,6 +365,15 @@ export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tok
             <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-lg text-rose-400 text-sm flex items-center gap-2">
               <div className="w-2 h-2 rounded-full bg-rose-500" />
               同步失败，请检查配置信息或网络连接。
+            </div>
+          )}
+
+          {syncResponse && (
+            <div className="mt-4">
+              <label className="text-xs font-medium text-slate-400 mb-1.5 block">同步完整响应 JSON</label>
+              <pre className="w-full bg-slate-950 border border-slate-700 rounded-lg p-3 text-xs text-slate-200 overflow-x-auto max-h-64 overflow-y-auto">
+{syncResponse}
+              </pre>
             </div>
           )}
         </div>

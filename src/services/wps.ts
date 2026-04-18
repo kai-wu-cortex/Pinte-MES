@@ -164,7 +164,7 @@ export async function fetchTasksFromWps(
     colTo?: number;
     apiBase?: string;
   }
-): Promise<Task[]> {
+): Promise<{ tasks: Task[]; rawData: WpsSpreadsheetRangeResponse }> {
   const spreadsheetId = options?.spreadsheetId || WPS_CONFIG.spreadsheetId;
   if (!spreadsheetId) {
     throw new Error('WPS spreadsheet ID not configured');
@@ -215,12 +215,13 @@ export async function fetchTasksFromWps(
 
   if (!data.values || data.values.length <= 1) {
     // No data or only header row
-    return [];
+    return { tasks: [], rawData: data };
   }
 
   // Assume first row is header, skip it
   const rows = data.values.slice(1);
-  return rows.map((row, index) => convertWpsRowToTask(row, index));
+  const tasks = rows.map((row, index) => convertWpsRowToTask(row, index));
+  return { tasks, rawData: data };
 }
 
 /**
@@ -294,7 +295,7 @@ export function getWpsAuthorizationUrl(
   redirectUri: string = WPS_CONFIG.redirectUri
 ): string {
   // According to WPS official docs: endpoint is /oauth2/auth
-  return `${apiBase}/oauth2/auth?client_id=${encodeURIComponent(clientId)}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=kso.user_base.read`;
+  return `${apiBase}/oauth2/auth?client_id=${encodeURIComponent(clientId)}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=kso.user_base.read kso.sheets.read`;
 }
 
 export { WPS_CONFIG };

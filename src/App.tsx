@@ -29,6 +29,7 @@ export default function App() {
   const [isGettingToken, setIsGettingToken] = useState(false);
   const [tokenStatus, setTokenStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [tokenResponse, setTokenResponse] = useState<string>('');
+  const [syncResponse, setSyncResponse] = useState<string>('');
   const [autoCode, setAutoCode] = useState<string | undefined>();
 
   // Extract code from URL search params on mount (for OAuth callback)
@@ -94,7 +95,7 @@ export default function App() {
     try {
       setIsSyncing(true);
       const token = await getWpsAccessToken(undefined, config);
-      const wpsTasks = await fetchTasksFromWps(token.access_token, {
+      const { tasks: wpsTasks, rawData } = await fetchTasksFromWps(token.access_token, {
         spreadsheetId: config?.fileId,
         worksheetId: config?.worksheetId,
         rowFrom: config?.rowFrom,
@@ -103,6 +104,7 @@ export default function App() {
         colTo: config?.colTo,
         apiBase: config?.apiUrl,
       });
+      setSyncResponse(JSON.stringify(rawData, null, 2));
       if (wpsTasks.length > 0) {
         setTasks(wpsTasks);
         console.log(`Synced ${wpsTasks.length} tasks from WPS`);
@@ -111,6 +113,7 @@ export default function App() {
       }
     } catch (err) {
       console.error('WPS sync failed:', err);
+      setSyncResponse(JSON.stringify({ error: String(err) }, null, 2));
       throw err;
     } finally {
       setIsSyncing(false);
@@ -118,6 +121,7 @@ export default function App() {
   };
 
   const handleSyncWPS = async (config: any): Promise<void> => {
+    setSyncResponse('');
     await syncTasksFromWps(config);
   };
 
@@ -325,6 +329,7 @@ export default function App() {
           isGettingToken={isGettingToken}
           initialCode={autoCode}
           tokenResponse={tokenResponse}
+          syncResponse={syncResponse}
         />
       )}
     </div>
