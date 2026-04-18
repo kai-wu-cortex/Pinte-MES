@@ -1,28 +1,20 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { X, ExternalLink } from 'lucide-react';
 import type { IWps } from '../../public/wps/index';
+import { Task } from '../types';
 
 interface ExcelPreviewModalProps {
-  url: string;
+  task: Task | null;
+  mainFileId: string;
   onClose: () => void;
 }
 
-export function ExcelPreviewModal({ url, onClose }: ExcelPreviewModalProps) {
+export function ExcelPreviewModal({ task, mainFileId, onClose }: ExcelPreviewModalProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const wpsInstanceRef = useRef<IWps | null>(null);
-
-  // Extract fileId from url or use directly
-  const getFileId = (fileUrl: string): string => {
-    // If it's already just a fileId, return it
-    if (!fileUrl.includes('/') && !fileUrl.includes('\\')) {
-      return fileUrl;
-    }
-    // Extract fileId from WPS URL - adjust pattern based on actual URL format
-    const match = fileUrl.match(/([a-zA-Z0-9]+)$/);
-    return match ? match[1] : fileUrl;
-  };
+  const [targetFileId, setTargetFileId] = useState<string | null>(null);
 
   // Get WebOffice App ID: use saved config if available, otherwise fall back to env var
   const getWebOfficeAppId = (): string => {
@@ -38,9 +30,36 @@ export function ExcelPreviewModal({ url, onClose }: ExcelPreviewModalProps) {
     return import.meta.env.VITE_WEB_OFFICE_APP_ID || import.meta.env.VITE_WPS_APP_ID || '';
   };
 
+  // Open main document first, get attachment from cell, then open attachment
+  const openAttachmentFromCell = async (instance: IWps, mainFileId: string, row: number, col: number): Promise<string> => {
+    await instance.ready();
+    const app = instance.Application;
+
+    // Get the cell via Application API
+    // WPS API: app.ActiveSheet.Cells.Item(row + 1, col + 1) (row/col in API is 1-based)
+    const activeSheet = await app.ActiveSheet;
+    const cell = await activeSheet.Cells.Item(row + 1, col + 1);
+    // Get attachments from cell (SDK should have API for this)
+    // According to WPS WebOffice docs, we can get attachments from cell
+    if (cell && typeof cell.getAttachments === 'function') {
+      const attachments = await cell.getAttachments();
+      if (attachments && attachments.length > 0) {
+        // Return first attachment id
+        return attachments[0].id;
+      }
+    }
+    // Fallback: if cell contains fileId as text, use that
+    const value = await cell.Value;
+    if (value && typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+    throw new Error('该单元格未找到电子流程卡附件');
+  };
+
   useEffect(() => {
     setLoading(true);
     setError(null);
+    setTargetFileId(null);
 
     if (!containerRef.current || !window.WebOfficeSDK) {
       const errorMsg = 'WPS WebOffice SDK not loaded';
@@ -50,13 +69,18 @@ export function ExcelPreviewModal({ url, onClose }: ExcelPreviewModalProps) {
       return;
     }
 
-    const fileId = getFileId(url);
     const appId = getWebOfficeAppId();
 
     if (!appId) {
       const errorMsg = 'WebOffice App ID not configured. Please set it in Settings → WebOffice 嵌入预览配置';
       console.error(errorMsg);
       setError(errorMsg);
+      setLoading(false);
+      return;
+    }
+
+    if (!task) {
+      setError('No task selected');
       setLoading(false);
       return;
     }
@@ -72,29 +96,85 @@ export function ExcelPreviewModal({ url, onClose }: ExcelPreviewModalProps) {
     }
 
     try {
-      const instance = window.WebOfficeSDK.init({
-        appId,
-        officeType: window.WebOfficeSDK.OfficeType.Spreadsheet,
-        fileId,
-        mount: containerRef.current,
-        isListenResize: true,
-        attrAllow: ['clipboard-read', 'clipboard-write'],
-      });
+      // If we have cell position (it's an attachment in main spreadsheet), open main file first to get attachment fileId
+      const openMainAndGetAttachment = async () => {
+        // If task has cell position - get attachment from main spreadsheet
+        if (typeof task.fileWpsRow === 'number' && typeof task.fileWpsCol === 'number') {
+          // Open main spreadsheet
+          const mainInstance = window.WebOfficeSDK.init({
+            appId,
+            officeType: window.WebOfficeSDK.OfficeType.Spreadsheet,
+            fileId: mainFileId,
+            mount: containerRef.current,
+            isListenResize: true,
+            attrAllow: ['clipboard-read', 'clipboard-write'],
+          });
 
-      wpsInstanceRef.current = instance;
+          wpsInstanceRef.current = mainInstance;
 
-      // Register event listeners before calling ready()
-      instance.on('fileOpen', () => {
-        console.log('WPS file opened successfully');
-      });
+          const attachmentFileId = await openAttachmentFromCell(mainInstance, mainFileId, task.fileWpsRow, task.fileWpsCol);
+          setTargetFileId(attachmentFileId);
 
-      instance.ready().then(() => {
-        setLoading(false);
-      }).catch((err: Error) => {
-        console.error('WPS init failed:', err);
-        setError(err.message || 'Failed to initialize WPS Office');
-        setLoading(false);
-      });
+          // Now open the attachment in the same container
+          // Destroy main instance first
+          await mainInstance.destroy();
+
+          const attachmentInstance = window.WebOfficeSDK.init({
+            appId,
+            officeType: window.WebOfficeSDK.OfficeType.Spreadsheet,
+            fileId: attachmentFileId,
+            mount: containerRef.current,
+            isListenResize: true,
+            attrAllow: ['clipboard-read', 'clipboard-write'],
+          });
+
+          wpsInstanceRef.current = attachmentInstance;
+
+          attachmentInstance.on('fileOpen', () => {
+            console.log('WPS attachment file opened successfully');
+          });
+
+          attachmentInstance.ready().then(() => {
+            setLoading(false);
+          }).catch((err: Error) => {
+            console.error('WPS attachment init failed:', err);
+            setError(err.message || 'Failed to initialize WPS Office');
+            setLoading(false);
+          });
+        } else {
+          // Direct open given fileId
+          let openFileId = task.fileUrl || '';
+          if (!openFileId && task.id) {
+            openFileId = task.id;
+          }
+          setTargetFileId(openFileId);
+
+          const instance = window.WebOfficeSDK.init({
+            appId,
+            officeType: window.WebOfficeSDK.OfficeType.Spreadsheet,
+            fileId: openFileId,
+            mount: containerRef.current,
+            isListenResize: true,
+            attrAllow: ['clipboard-read', 'clipboard-write'],
+          });
+
+          wpsInstanceRef.current = instance;
+
+          instance.on('fileOpen', () => {
+            console.log('WPS file opened successfully');
+          });
+
+          instance.ready().then(() => {
+            setLoading(false);
+          }).catch((err: Error) => {
+            console.error('WPS init failed:', err);
+            setError(err.message || 'Failed to initialize WPS Office');
+            setLoading(false);
+          });
+        }
+      };
+
+      openMainAndGetAttachment();
 
     } catch (err) {
       console.error('Failed to init WPS:', err);
@@ -114,7 +194,9 @@ export function ExcelPreviewModal({ url, onClose }: ExcelPreviewModalProps) {
         containerRef.current.innerHTML = '';
       }
     };
-  }, [url]);
+  }, [task, mainFileId]);
+
+  const url = task?.fileUrl || targetFileId;
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">
@@ -123,7 +205,7 @@ export function ExcelPreviewModal({ url, onClose }: ExcelPreviewModalProps) {
           <h2 className="text-lg font-semibold text-white">电子流程卡</h2>
           <div className="flex items-center gap-2">
             <button
-              onClick={() => window.open(url, '_blank')}
+              onClick={() => window.open(`https://open.wps.cn/view/${url}`, '_blank')}
               className="p-2 hover:bg-slate-800 rounded-lg transition-colors text-slate-400 hover:text-white"
               title="Open in new tab"
             >

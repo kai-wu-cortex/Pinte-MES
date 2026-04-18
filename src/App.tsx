@@ -23,7 +23,7 @@ export default function App() {
   const [viewMode, setViewMode] = useLocalStorage<ViewMode>('mes_viewMode', 'calendar');
   const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewTask, setPreviewTask] = useState<Task | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterToday, setFilterToday] = useState(false);
@@ -82,55 +82,9 @@ export default function App() {
     setSelectedTask(task);
   };
 
-  // Handle process card click - if file is an attachment on the cell, fetch its fileId first
+  // Handle process card click - open modal, modal handles getting attachment via WebOffice SDK
   const handleProcessCardClick = async (task: Task) => {
-    // If we already have stored cell position, fetch attachment fileId from WPS API
-    if (typeof task.fileWpsRow === 'number' && typeof task.fileWpsCol === 'number') {
-      try {
-        // Get main spreadsheet config from localStorage
-        const savedConfig = localStorage.getItem('wps_config');
-        const config = savedConfig ? JSON.parse(savedConfig) : {};
-        const mainFileId = config.fileId;
-        const worksheetId = config.worksheetId || 1;
-        const apiUrl = config.apiUrl || 'https://openapi.wps.cn';
-
-        if (!cachedToken) {
-          console.error('No WPS access token available');
-          alert('需要先完成 WPS 授权并同步数据才能打开电子流程卡');
-          return;
-        }
-
-        const attachments = await getCellAttachments(
-          cachedToken.access_token,
-          mainFileId,
-          worksheetId,
-          task.fileWpsRow,
-          task.fileWpsCol,
-          apiUrl
-        );
-
-        if (attachments.attachments && attachments.attachments.length > 0) {
-          // Use the first attachment (assuming one per cell)
-          const fileId = attachments.attachments[0].id;
-          setPreviewUrl(fileId);
-        } else if (task.fileUrl && task.fileUrl.trim()) {
-          // Fallback to stored fileUrl if no attachments found
-          setPreviewUrl(task.fileUrl);
-        } else {
-          console.warn('No attachments found on this cell');
-          alert('此单元格没有找到电子流程卡附件');
-        }
-      } catch (err) {
-        console.error('Failed to get cell attachment:', err);
-        alert(`获取电子流程卡失败: ${err instanceof Error ? err.message : String(err)}`);
-      }
-    } else if (task.fileUrl && task.fileUrl.trim()) {
-      // Direct fileId stored
-      setPreviewUrl(task.fileUrl);
-    } else {
-      console.warn('No process card file configured for this task');
-      alert('此任务未配置电子流程卡');
-    }
+    setPreviewTask(task);
   };
 
   // Common sync logic from WPS
@@ -386,9 +340,20 @@ export default function App() {
         )}
       </AnimatePresence>
       <AnimatePresence>
-        {previewUrl && (
+        {previewTask && (
           <Suspense fallback={null}>
-            <ExcelPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+            <ExcelPreviewModal
+              task={previewTask}
+              mainFileId={(() => {
+                const savedConfig = localStorage.getItem('wps_config');
+                if (savedConfig) {
+                  const parsed = JSON.parse(savedConfig);
+                  return parsed.fileId || '';
+                }
+                return '';
+              })()}
+              onClose={() => setPreviewTask(null)}
+            />
           </Suspense>
         )}
       </AnimatePresence>
