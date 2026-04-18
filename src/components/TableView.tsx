@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { format } from 'date-fns';
 import { Task } from '../types';
 import { cn } from './MetricCard';
-import { Columns, Rows, Check, ListTree, ChevronDown, ChevronRight, GripVertical } from 'lucide-react';
+import { Columns, Rows, Check, ListTree, ChevronDown, ChevronRight, GripVertical, FilterX } from 'lucide-react';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
@@ -48,7 +48,14 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
   const [showGroupMenu, setShowGroupMenu] = useState(false);
   const [groupBy, setGroupBy] = useLocalStorage<string>('mes_table_groupBy', 'none');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  
+  const [filters, setFilters] = useLocalStorage<Record<string, string>>('mes_table_filters', {});
+
+  const clearFilter = (colId: string) => {
+    const newFilters = { ...filters };
+    delete newFilters[colId];
+    setFilters(newFilters);
+  };
+
   const toggleCol = (id: string) => {
     const next = new Set(visibleCols);
     if (next.has(id)) {
@@ -141,16 +148,30 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
     setExpandedGroups(next);
   };
 
+  // Apply all column filters before grouping
+  const filteredTasks = useMemo(() => {
+    let result = tasks;
+    const filterEntries = Object.entries(filters).filter(([_, value]) => value.trim() !== '');
+    if (filterEntries.length === 0) return result;
+
+    return result.filter(task => {
+      return filterEntries.every(([colId, filterValue]) => {
+        const value = String(task[colId as keyof Task] || '').toLowerCase();
+        return value.includes(filterValue.trim().toLowerCase());
+      });
+    });
+  }, [tasks, filters]);
+
   const groupedTasks = React.useMemo<Record<string, Task[]>>(() => {
-    if (groupBy === 'none') return { '所有任务': tasks };
+    if (groupBy === 'none') return { '所有任务': filteredTasks };
     const groups: Record<string, Task[]> = {};
-    tasks.forEach(task => {
+    filteredTasks.forEach(task => {
       let key = String(task[groupBy as keyof Task]);
       if (!groups[key]) groups[key] = [];
       groups[key].push(task);
     });
     return groups;
-  }, [tasks, groupBy]);
+  }, [filteredTasks, groupBy]);
 
   return (
     <div className="w-full h-full flex flex-col rounded-xl border border-blue-900/50 bg-slate-900/50 backdrop-blur-sm overflow-hidden">
@@ -262,7 +283,7 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
               <thead className="text-xs text-blue-300 uppercase bg-slate-800/80 sticky top-0 z-10 shadow-sm">
                 <tr>
                   {orderedColumns.map(col => visibleCols.has(col.id) && (
-                    <SortableHeader key={col.id} col={col} spacing={spacing} colWidths={colWidths} handleResizeStart={handleResizeStart} />
+                    <SortableHeader key={col.id} col={col} spacing={spacing} colWidths={colWidths} handleResizeStart={handleResizeStart} filters={filters} setFilters={setFilters} />
                   ))}
                 </tr>
               </thead>
@@ -333,27 +354,65 @@ function SortableMenuItem({ col, visibleCols, toggleCol }: any) {
   );
 }
 
-function SortableHeader({ col, spacing, colWidths, handleResizeStart }: any) {
+function SortableHeader({ col, spacing, colWidths, handleResizeStart, filters, setFilters }: any) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: col.id });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     width: colWidths[col.id]
   };
+  const currentFilter = filters[col.id] || '';
+
+  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    if (value) {
+      setFilters({ ...filters, [col.id]: value });
+    } else {
+      const newFilters = { ...filters };
+      delete newFilters[col.id];
+      setFilters(newFilters);
+    }
+  };
 
   return (
-    <th 
+    <th
       ref={setNodeRef}
       style={style}
       className={cn("font-medium border-b border-blue-900/50 bg-slate-800/90 backdrop-blur-md relative group select-none", spacingStyles[spacing])}
     >
-      <div className="flex items-center gap-2">
-        <div {...attributes} {...listeners} className="cursor-grab">
-          <GripVertical className="w-3 h-3 text-slate-500" />
+      <div className="flex flex-col">
+        <div className="flex items-center gap-2">
+          <div {...attributes} {...listeners} className="cursor-grab">
+            <GripVertical className="w-3 h-3 text-slate-500" />
+          </div>
+          <div className="truncate pr-4 font-medium">{col.label}</div>
         </div>
-        <div className="truncate pr-4">{col.label}</div>
+        <div className="relative mt-1">
+          <input
+            type="text"
+            value={currentFilter}
+            onChange={handleFilterChange}
+            placeholder={`筛选...`}
+            className={cn(
+              "w-full bg-slate-900/80 border rounded px-2 py-0.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500",
+              currentFilter ? "border-blue-400" : "border-slate-700"
+            )}
+          />
+          {currentFilter && (
+            <button
+              onClick={() => {
+                const newFilters = { ...filters };
+                delete newFilters[col.id];
+                setFilters(newFilters);
+              }}
+              className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+            >
+              <FilterX className="w-3 h-3" />
+            </button>
+          )}
+        </div>
       </div>
-      <div 
+      <div
         className="absolute right-0 top-0 bottom-0 w-1 cursor-col-resize hover:bg-blue-500/50 group-hover:bg-blue-500/30 z-20"
         onMouseDown={(e) => handleResizeStart(e, col.id)}
       />

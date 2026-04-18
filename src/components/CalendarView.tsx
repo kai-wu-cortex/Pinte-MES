@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Task } from '../types';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, addMonths, subMonths, addWeeks, subWeeks, isSameMonth } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, Check, Settings2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, Check, Settings2, FilterX } from 'lucide-react';
 import { cn } from './MetricCard';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { useLocalStorage } from '../hooks/useLocalStorage';
@@ -30,8 +30,30 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick, isAutoScr
   const [visibleFieldsArr, setVisibleFieldsArr] = useLocalStorage<string[]>('mes_calendar_visibleFields', ['id', 'productName', 'machineName']);
   const visibleFields = new Set(visibleFieldsArr);
   const [showFieldMenu, setShowFieldMenu] = useState(false);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
+  const [filters, setFilters] = useLocalStorage<Record<string, string>>('mes_calendar_filters', {});
 
-  const startDate = viewType === 'month' 
+  const clearFilter = (fieldId: string) => {
+    const newFilters = { ...filters };
+    delete newFilters[fieldId];
+    setFilters(newFilters);
+  };
+
+  // Apply all filters
+  const filteredTasks = useMemo(() => {
+    let result = tasks;
+    const filterEntries = Object.entries(filters).filter(([_, value]) => value.trim() !== '');
+    if (filterEntries.length === 0) return result;
+
+    return result.filter(task => {
+      return filterEntries.every(([fieldId, filterValue]) => {
+        const value = String(task[fieldId as keyof Task] || '').toLowerCase();
+        return value.includes(filterValue.trim().toLowerCase());
+      });
+    });
+  }, [tasks, filters]);
+
+  const startDate = viewType === 'month'
     ? startOfWeek(startOfMonth(currentDate), { weekStartsOn: 1 }) 
     : startOfWeek(currentDate, { weekStartsOn: 1 });
   const endDate = viewType === 'month' 
@@ -92,9 +114,66 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick, isAutoScr
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Filter Menu */}
+          <div className="relative">
+            <button
+              onClick={() => setShowFilterMenu(!showFilterMenu)}
+              className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-colors"
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+              筛选
+              {Object.keys(filters).length > 0 && (
+                <span className="bg-blue-500 text-white text-[10px] px-1 py-0.5 rounded-full">
+                  {Object.keys(filters).length}
+                </span>
+              )}
+            </button>
+            {showFilterMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowFilterMenu(false)} />
+                <div className="absolute right-0 top-full mt-1 z-50 w-64 bg-slate-800 border border-blue-900/50 rounded-lg shadow-xl py-2 overflow-hidden max-h-80 overflow-y-auto">
+                  {CALENDAR_FIELDS.map(field => (
+                    <div key={field.id} className="px-3 py-2">
+                      <label className="block text-xs text-slate-300 mb-1">{field.label}</label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={filters[field.id] || ''}
+                          onChange={(e) => {
+                            const value = e.target.value;
+                            if (value) {
+                              setFilters({ ...filters, [field.id]: value });
+                            } else {
+                              const newFilters = { ...filters };
+                              delete newFilters[field.id];
+                              setFilters(newFilters);
+                            }
+                          }}
+                          placeholder={`筛选${field.label}...`}
+                          className={cn(
+                            "w-full bg-slate-900 border rounded px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500",
+                            filters[field.id] ? "border-blue-400" : "border-slate-700"
+                          )}
+                        />
+                        {filters[field.id] && (
+                          <button
+                            onClick={() => clearFilter(field.id)}
+                            className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                          >
+                            <FilterX className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Field Settings Menu */}
           <div className="relative">
-            <button 
+            <button
               onClick={() => setShowFieldMenu(!showFieldMenu)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-md text-xs font-medium text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700 transition-colors"
             >
@@ -137,7 +216,7 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick, isAutoScr
           {/* Days Grid */}
           <div className="flex-1 grid grid-cols-7 auto-rows-fr">
             {days.map((day, i) => {
-              const dayTasks = tasks.filter(t => isSameDay(new Date(t.startTime), day));
+              const dayTasks = filteredTasks.filter(t => isSameDay(new Date(t.startTime), day));
               const isCurrentMonth = isSameMonth(day, currentDate);
               
               return (
