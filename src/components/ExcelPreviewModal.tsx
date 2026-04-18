@@ -24,6 +24,20 @@ export function ExcelPreviewModal({ url, onClose }: ExcelPreviewModalProps) {
     return match ? match[1] : fileUrl;
   };
 
+  // Get WebOffice App ID: use saved config if available, otherwise fall back to env var
+  const getWebOfficeAppId = (): string => {
+    try {
+      const saved = localStorage.getItem('wps_config');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed.webOfficeAppId && parsed.webOfficeAppId.trim()) {
+          return parsed.webOfficeAppId;
+        }
+      }
+    } catch {}
+    return import.meta.env.VITE_WEB_OFFICE_APP_ID || import.meta.env.VITE_WPS_APP_ID || '';
+  };
+
   useEffect(() => {
     setLoading(true);
     setError(null);
@@ -37,10 +51,10 @@ export function ExcelPreviewModal({ url, onClose }: ExcelPreviewModalProps) {
     }
 
     const fileId = getFileId(url);
-    const appId = import.meta.env.VITE_WPS_APP_ID;
+    const appId = getWebOfficeAppId();
 
     if (!appId) {
-      const errorMsg = 'WPS App ID not configured';
+      const errorMsg = 'WebOffice App ID not configured. Please set it in Settings → WebOffice 嵌入预览配置';
       console.error(errorMsg);
       setError(errorMsg);
       setLoading(false);
