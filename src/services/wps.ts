@@ -242,7 +242,8 @@ export async function fetchTasksFromWps(
       rowsMap[rowKey] = [];
     }
     // Ensure cells are ordered by column index
-    rowsMap[rowKey][cell.col_from - 1] = cell.cell_text || '';
+    // col_from is already 0-based according to actual WPS response
+    rowsMap[rowKey][cell.col_from] = cell.cell_text || '';
   });
 
   // Convert to rows array (ordered by row number)
