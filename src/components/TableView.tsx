@@ -273,24 +273,43 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
       return groupedTasks;
     }
 
-    // If grouped, we need to paginate across all groups? No - pagination applies to total rows regardless of grouping
-    const allTasks: { groupName: string; task: Task; isGroupHeader: boolean }[] = [];
-    (Object.entries(groupedTasks) as [string, Task[]][]).forEach(([groupName, groupTasks]) => {
-      if (groupBy !== 'none') {
-        allTasks.push({ groupName, task: null as any, isGroupHeader: true });
-      }
-      groupTasks.forEach(task => {
-        allTasks.push({ groupName, task, isGroupHeader: false });
-      });
-    });
+    // If grouping is none, simple pagination directly on filtered array
+    if (groupBy === 'none') {
+      const startIndex = (currentPage - 1) * pageSize;
+      const endIndex = startIndex + pageSize;
+      return { '所有任务': filteredTasks.slice(startIndex, endIndex) };
+    }
 
-    const startIndex = (currentPage - 1) * pageSize;
-    const endIndex = startIndex + pageSize;
-    const paginatedItems = allTasks.slice(startIndex, endIndex);
+    // If grouped: we need to paginate across all groups - count only task rows (ignore group headers for page sizing)
+    let taskCount = 0;
+    const pageSizeNum = pageSize as number;
+    const startTaskIndex = (currentPage - 1) * pageSizeNum;
+    const endTaskIndex = startTaskIndex + pageSizeNum;
+    const includedItems: { groupName: string; task: Task; isGroupHeader: boolean }[] = [];
+
+    (Object.entries(groupedTasks) as [string, Task[]][]).forEach(([groupName, groupTasks]) => {
+      // Include group header if this group still has tasks in current page range
+      const groupStartIndex = taskCount;
+      const groupEndIndex = taskCount + groupTasks.length;
+
+      if (groupEndIndex > startTaskIndex && groupStartIndex < endTaskIndex) {
+        // This group has at least one task in current page - add the group header
+        includedItems.push({ groupName, task: null as any, isGroupHeader: true });
+        groupTasks.forEach(task => {
+          if (taskCount >= startTaskIndex && taskCount < endTaskIndex) {
+            includedItems.push({ groupName, task, isGroupHeader: false });
+          }
+          taskCount++;
+        });
+      } else {
+        // No tasks from this group in current page - skip entirely
+        taskCount += groupTasks.length;
+      }
+    });
 
     // Re-group the paginated items
     const result: Record<string, Task[]> = {};
-    paginatedItems.forEach(item => {
+    includedItems.forEach(item => {
       if (!item.isGroupHeader) {
         if (!result[item.groupName]) {
           result[item.groupName] = [];
@@ -298,11 +317,6 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
         result[item.groupName].push(item.task);
       }
     });
-
-    // If grouping is none, just return the paginated array
-    if (groupBy === 'none') {
-      return { '所有任务': filteredTasks.slice(startIndex, endIndex) };
-    }
 
     return result;
   }, [groupedTasks, filteredTasks, currentPage, pageSize, groupBy]);
