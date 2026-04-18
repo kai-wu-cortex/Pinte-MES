@@ -189,10 +189,13 @@ export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tok
             </label>
             <input
               type="number"
-              value={config.worksheetId ?? 0}
-              onChange={e => saveConfig({...config, worksheetId: parseInt(e.target.value) || 0})}
+              value={config.worksheetId ?? 1}
+              onChange={e => {
+                const val = parseInt(e.target.value);
+                saveConfig({...config, worksheetId: isNaN(val) ? 1 : val});
+              }}
               className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-              placeholder="工作表 ID，一般第一个工作表是 0"
+              placeholder="工作表 ID，一般第一个工作表是 1"
             />
           </div>
 
@@ -203,10 +206,13 @@ export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tok
               </label>
               <input
                 type="number"
-                value={config.rowFrom ?? 1}
-                onChange={e => saveConfig({...config, rowFrom: parseInt(e.target.value) || 1})}
+                value={config.rowFrom ?? 0}
+                onChange={e => {
+                  const val = parseInt(e.target.value);
+                  saveConfig({...config, rowFrom: isNaN(val) ? 0 : val});
+                }}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                placeholder="1"
+                placeholder="0"
               />
             </div>
             <div>
@@ -215,10 +221,13 @@ export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tok
               </label>
               <input
                 type="number"
-                value={config.rowTo ?? 1000}
-                onChange={e => saveConfig({...config, rowTo: parseInt(e.target.value) || 1000})}
+                value={config.rowTo ?? 9999}
+                onChange={e => {
+                  const val = parseInt(e.target.value);
+                  saveConfig({...config, rowTo: isNaN(val) ? 9999 : val});
+                }}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                placeholder="1000"
+                placeholder="9999"
               />
             </div>
           </div>
@@ -230,10 +239,13 @@ export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tok
               </label>
               <input
                 type="number"
-                value={config.colFrom ?? 1}
-                onChange={e => saveConfig({...config, colFrom: parseInt(e.target.value) || 1})}
+                value={config.colFrom ?? 0}
+                onChange={e => {
+                  const val = parseInt(e.target.value);
+                  saveConfig({...config, colFrom: isNaN(val) ? 0 : val});
+                }}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                placeholder="1"
+                placeholder="0"
               />
             </div>
             <div>
@@ -242,10 +254,13 @@ export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tok
               </label>
               <input
                 type="number"
-                value={config.colTo ?? 26}
-                onChange={e => saveConfig({...config, colTo: parseInt(e.target.value) || 26})}
+                value={config.colTo ?? 10}
+                onChange={e => {
+                  const val = parseInt(e.target.value);
+                  saveConfig({...config, colTo: isNaN(val) ? 10 : val});
+                }}
                 className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-                placeholder="26"
+                placeholder="10"
               />
             </div>
           </div>
