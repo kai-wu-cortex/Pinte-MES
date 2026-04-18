@@ -487,70 +487,75 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
             </table>
           </SortableContext>
         </DndContext>
-        {/* Pagination Controls */}
-        {pageSize !== 'all' && (
-          <div className="sticky bottom-0 bg-slate-800/90 border-t border-blue-900/50 px-4 py-3 flex items-center justify-between mt-2 backdrop-blur-md">
-            <div className="text-xs text-slate-400">
-              显示 {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalFilteredRows)} 共 {totalFilteredRows} 条
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="flex items-center gap-1 mr-4">
-                <span className="text-xs text-slate-400">每页:</span>
-                <select
-                  value={pageSize}
-                  onChange={(e) => setPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                  className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
-                >
-                  <option value={10}>10</option>
-                  <option value={20}>20</option>
-                  <option value={50}>50</option>
-                  <option value={100}>100</option>
-                  <option value="all">全部</option>
-                </select>
-              </div>
-              <button
-                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                disabled={currentPage <= 1}
-                className="p-1.5 rounded border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronLeft className="w-4 h-4" />
-              </button>
-              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                let pageNum: number;
-                if (totalPages <= 5) {
-                  pageNum = i + 1;
-                } else if (currentPage <= 3) {
-                  pageNum = i + 1;
-                } else if (currentPage >= totalPages - 2) {
-                  pageNum = totalPages - 4 + i;
-                } else {
-                  pageNum = currentPage - 2 + i;
-                }
-                return (
-                  <button
-                    key={pageNum}
-                    onClick={() => setCurrentPage(pageNum)}
-                    className={cn(
-                      "w-8 h-8 flex items-center justify-center rounded text-xs font-medium border transition-colors",
-                      currentPage === pageNum
-                        ? "bg-blue-600 border-blue-600 text-white"
-                        : "border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-700"
-                    )}
-                  >
-                    {pageNum}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                disabled={currentPage >= totalPages}
-                className="p-1.5 rounded border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <ChevronRightIcon className="w-4 h-4" />
-              </button>
-            </div>
+        {/* Pagination Controls - always show page size selector even when 'all' */}
+        <div className="sticky bottom-0 bg-slate-800/90 border-t border-blue-900/50 px-4 py-3 flex items-center justify-between mt-2 backdrop-blur-md">
+          <div className="text-xs text-slate-400">
+            {pageSize === 'all'
+              ? `显示全部 共 ${totalFilteredRows} 条`
+              : `显示 ${(currentPage - 1) * (pageSize as number) + 1} - ${Math.min(currentPage * (pageSize as number), totalFilteredRows)} 共 ${totalFilteredRows} 条`
+            }
           </div>
-        )}
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1 mr-4">
+              <span className="text-xs text-slate-400">每页:</span>
+              <select
+                value={pageSize === 'all' ? 'all' : pageSize}
+                onChange={(e) => setPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value="all">全部</option>
+              </select>
+            </div>
+            {pageSize !== 'all' && (
+              <>
+                <button
+                  onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1}
+                  className="p-1.5 rounded border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-4 h-4" />
+                </button>
+                {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                  let pageNum: number;
+                  if (totalPages <= 5) {
+                    pageNum = i + 1;
+                  } else if (currentPage <= 3) {
+                    pageNum = i + 1;
+                  } else if (currentPage >= totalPages - 2) {
+                    pageNum = totalPages - 4 + i;
+                  } else {
+                    pageNum = currentPage - 2 + i;
+                  }
+                  return (
+                    <button
+                      key={pageNum}
+                      onClick={() => setCurrentPage(pageNum)}
+                      className={cn(
+                        "w-8 h-8 flex items-center justify-center rounded text-xs font-medium border transition-colors",
+                        currentPage === pageNum
+                          ? "bg-blue-600 border-blue-600 text-white"
+                          : "border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-700"
+                      )}
+                    >
+                      {pageNum}
+                    </button>
+                  );
+                })}
+                <button
+                  onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                  disabled={currentPage >= totalPages}
+                  className="p-1.5 rounded border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <ChevronRightIcon className="w-4 h-4" />
+                </button>
+              </>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
