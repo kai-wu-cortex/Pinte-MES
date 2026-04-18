@@ -9,7 +9,7 @@ import { useLocalStorage } from '../hooks/useLocalStorage';
 interface CalendarViewProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
-  onProcessCardClick: (url: string) => void;
+  onProcessCardClick: (task: Task) => void;
 }
 
 type FilterOperator = 'contains' | 'notContains' | 'equals' | 'notEquals' | 'startsWith' | 'endsWith' | 'isEmpty' | 'isNotEmpty';
@@ -340,9 +340,9 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick }: Calenda
                         className="text-[10px] p-1.5 rounded border border-blue-900/30 bg-blue-900/10 text-slate-300 cursor-pointer hover:opacity-80 transition-opacity flex flex-col gap-0.5"
                       >
                         {visibleFields.has('id') && (
-                          <div 
+                          <div
                             className="font-mono font-bold cursor-pointer hover:underline"
-                            onClick={(e) => { e.stopPropagation(); onProcessCardClick(task.fileUrl || ''); }}
+                            onClick={(e) => { e.stopPropagation(); onProcessCardClick(task); }}
                           >
                             {task.id}
                           </div>

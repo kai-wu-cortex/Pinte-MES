@@ -319,6 +319,11 @@ function convertWpsRowToTask(row: string[], index: number): Task {
     return date.toISOString();
   };
 
+  // The actual row index in WPS spreadsheet: original data starts at row 2 (0-based) after header
+  const wpsRowIndex = index + 2;
+  // fileUrl is in column 3 (0-based)
+  const wpsColIndex = 3;
+
   return {
     id: (id || '').trim(),
     process: (process || '').trim(),
@@ -335,6 +340,8 @@ function convertWpsRowToTask(row: string[], index: number): Task {
     operator: (operator || '').trim(),
     notes: (notes || '').trim(),
     fileUrl: (fileUrl || '').trim() || undefined,
+    fileWpsRow: wpsRowIndex,
+    fileWpsCol: wpsColIndex,
   };
 }
 
@@ -349,6 +356,64 @@ export function getWpsAuthorizationUrl(
 ): string {
   // According to WPS official docs: endpoint is /oauth2/auth
   return `${apiBase}/oauth2/auth?client_id=${encodeURIComponent(clientId)}&response_type=code&redirect_uri=${encodeURIComponent(redirectUri)}&scope=kso.user_base.read kso.sheets.read`;
+}
+
+export interface WpsCellAttachment {
+  id: string;
+  name: string;
+  size: number;
+}
+
+export interface WpsCellAttachmentsResponse {
+  attachments: WpsCellAttachment[];
+}
+
+/**
+ * Get list of attachments on a specific cell
+ * GET /v7/files/{file_id}/worksheets/{worksheet_id}/cells/{row}/{col}/attachments
+ */
+export async function getCellAttachments(
+  accessToken: string,
+  spreadsheetId: string,
+  worksheetId: number,
+  row: number,
+  col: number,
+  apiBase: string = WPS_CONFIG.apiBase
+): Promise<WpsCellAttachmentsResponse> {
+  const endpoint = `/v7/files/${encodeURIComponent(spreadsheetId)}/worksheets/${worksheetId}/cells/${row}/${col}/attachments`;
+
+  const isBrowser = typeof window !== 'undefined';
+  let response;
+
+  if (isBrowser) {
+    const proxyUrl = '/api/wps-proxy';
+    response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        endpoint,
+        headers: {
+          Authorization: `Bearer ${accessToken}`,
+        },
+      }),
+    });
+  } else {
+    const url = `${apiBase}${endpoint}`;
+    response = await fetch(url, {
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+      },
+    });
+  }
+
+  if (!response.ok) {
+    throw new Error(`Failed to get cell attachments: ${response.statusText}`);
+  }
+
+  const fullResponse = await response.json();
+  return fullResponse?.data || { attachments: [] };
 }
 
 export { WPS_CONFIG };

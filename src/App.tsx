@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import { MetricCard } from './components/MetricCard';
 import { INITIAL_TASKS, MACHINES } from './data';
-import { fetchTasksFromWps, getWpsAccessToken } from './services/wps';
+import { fetchTasksFromWps, getWpsAccessToken, getCellAttachments, cachedToken } from './services/wps';
 import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Search, Loader2 } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { cn } from './components/MetricCard';
@@ -82,8 +82,55 @@ export default function App() {
     setSelectedTask(task);
   };
 
-  const handleProcessCardClick = (url?: string) => {
-    if (url) setPreviewUrl(url);
+  // Handle process card click - if file is an attachment on the cell, fetch its fileId first
+  const handleProcessCardClick = async (task: Task) => {
+    // If we already have stored cell position, fetch attachment fileId from WPS API
+    if (typeof task.fileWpsRow === 'number' && typeof task.fileWpsCol === 'number') {
+      try {
+        // Get main spreadsheet config from localStorage
+        const savedConfig = localStorage.getItem('wps_config');
+        const config = savedConfig ? JSON.parse(savedConfig) : {};
+        const mainFileId = config.fileId;
+        const worksheetId = config.worksheetId || 1;
+        const apiUrl = config.apiUrl || 'https://openapi.wps.cn';
+
+        if (!cachedToken) {
+          console.error('No WPS access token available');
+          alert('需要先完成 WPS 授权并同步数据才能打开电子流程卡');
+          return;
+        }
+
+        const attachments = await getCellAttachments(
+          cachedToken.access_token,
+          mainFileId,
+          worksheetId,
+          task.fileWpsRow,
+          task.fileWpsCol,
+          apiUrl
+        );
+
+        if (attachments.attachments && attachments.attachments.length > 0) {
+          // Use the first attachment (assuming one per cell)
+          const fileId = attachments.attachments[0].id;
+          setPreviewUrl(fileId);
+        } else if (task.fileUrl && task.fileUrl.trim()) {
+          // Fallback to stored fileUrl if no attachments found
+          setPreviewUrl(task.fileUrl);
+        } else {
+          console.warn('No attachments found on this cell');
+          alert('此单元格没有找到电子流程卡附件');
+        }
+      } catch (err) {
+        console.error('Failed to get cell attachment:', err);
+        alert(`获取电子流程卡失败: ${err instanceof Error ? err.message : String(err)}`);
+      }
+    } else if (task.fileUrl && task.fileUrl.trim()) {
+      // Direct fileId stored
+      setPreviewUrl(task.fileUrl);
+    } else {
+      console.warn('No process card file configured for this task');
+      alert('此任务未配置电子流程卡');
+    }
   };
 
   // Common sync logic from WPS

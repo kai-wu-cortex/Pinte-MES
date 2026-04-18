@@ -52,7 +52,7 @@ const OPERATOR_LABELS: Record<FilterOperator, string> = {
 interface TableViewProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
-  onProcessCardClick: (url: string) => void;
+  onProcessCardClick: (task: Task) => void;
 }
 
 type Spacing = 'compact' | 'normal' | 'relaxed';
@@ -472,7 +472,7 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
                               key={col.id}
                               className={cn(cellClass, "whitespace-normal break-words", col.id === 'notes' ? "min-w-[200px]" : "", col.id === 'id' && "text-blue-400 font-mono cursor-pointer hover:underline")}
                               onClick={(e) => {
-                                if (col.id === 'id') { e.stopPropagation(); onProcessCardClick(task.fileUrl || ''); }
+                                if (col.id === 'id') { e.stopPropagation(); onProcessCardClick(task); }
                               }}
                             >
                               {col.id === 'notes' ? task.notes : task[col.id as keyof Task]}

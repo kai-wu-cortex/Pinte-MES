@@ -49,7 +49,7 @@ function matchesFilter(value: string, operator: FilterOperator, filterValue: str
 interface TaskViewProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
-  onProcessCardClick: (url: string) => void;
+  onProcessCardClick: (task: Task) => void;
 }
 
 const TASK_FIELDS = [
@@ -95,7 +95,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onProcessCardClick, 
             {visibleFields.has('id') && (
               <span 
                 className={cn("font-mono text-blue-400 bg-blue-900/20 px-1.5 py-0.5 rounded cursor-pointer hover:underline shrink-0", size === 'sm' ? 'text-[9px]' : size === 'md' ? 'text-[10px]' : 'text-xs')}
-                onClick={(e) => { e.stopPropagation(); onProcessCardClick(task.fileUrl || ''); }}
+                onClick={(e) => { e.stopPropagation(); onProcessCardClick(task); }}
               >
                 {task.id}
               </span>

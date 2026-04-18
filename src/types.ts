@@ -13,7 +13,9 @@ export interface Task {
   endTime: string; // ISO string
   operator: string;
   notes: string;
-  fileUrl?: string;
+  fileUrl?: string; // File URL or cell text
+  fileWpsRow?: number; // Row index of this attachment cell in main spreadsheet
+  fileWpsCol?: number; // Column index of this attachment cell in main spreadsheet
 }
 
 export interface Machine {
