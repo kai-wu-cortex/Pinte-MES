@@ -10,12 +10,12 @@ import { Task } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
 
 // Lazy load heavy components that are not always visible
-const TableView = React.lazy(() => import('./components/TableView'));
-const CalendarView = React.lazy(() => import('./components/CalendarView'));
-const TaskView = React.lazy(() => import('./components/TaskView'));
-const TaskDetailModal = React.lazy(() => import('./components/TaskDetailModal'));
-const SettingsModal = React.lazy(() => import('./components/SettingsModal'));
-const ExcelPreviewModal = React.lazy(() => import('./components/ExcelPreviewModal'));
+const TableView = React.lazy(() => import('./components/TableView').then(m => ({ default: m.TableView })));
+const CalendarView = React.lazy(() => import('./components/CalendarView').then(m => ({ default: m.CalendarView })));
+const TaskView = React.lazy(() => import('./components/TaskView').then(m => ({ default: m.TaskView })));
+const TaskDetailModal = React.lazy(() => import('./components/TaskDetailModal').then(m => ({ default: m.TaskDetailModal })));
+const SettingsModal = React.lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
+const ExcelPreviewModal = React.lazy(() => import('./components/ExcelPreviewModal').then(m => ({ default: m.ExcelPreviewModal })));
 
 type ViewMode = 'table' | 'calendar' | 'task';
 
