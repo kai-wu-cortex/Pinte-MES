@@ -1,19 +1,21 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { TableView } from './components/TableView';
-import { CalendarView } from './components/CalendarView';
-import { TaskView } from './components/TaskView';
+import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import { MetricCard } from './components/MetricCard';
-import { TaskDetailModal } from './components/TaskDetailModal';
-import { SettingsModal } from './components/SettingsModal';
-import { ExcelPreviewModal } from './components/ExcelPreviewModal';
 import { INITIAL_TASKS, MACHINES } from './data';
 import { fetchTasksFromWps, getWpsAccessToken } from './services/wps';
 import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Play, Square, Search, Loader2 } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { cn } from './components/MetricCard';
-import { motion, AnimatePresence } from 'motion/react';
+import { AnimatePresence, motion } from 'motion/react';
 import { Task } from './types';
 import { useLocalStorage } from './hooks/useLocalStorage';
+
+// Lazy load heavy components that are not always visible
+const TableView = React.lazy(() => import('./components/TableView'));
+const CalendarView = React.lazy(() => import('./components/CalendarView'));
+const TaskView = React.lazy(() => import('./components/TaskView'));
+const TaskDetailModal = React.lazy(() => import('./components/TaskDetailModal'));
+const SettingsModal = React.lazy(() => import('./components/SettingsModal'));
+const ExcelPreviewModal = React.lazy(() => import('./components/ExcelPreviewModal'));
 
 type ViewMode = 'table' | 'calendar' | 'task';
 
@@ -309,29 +311,47 @@ export default function App() {
               transition={{ duration: 0.2 }}
               className="h-full"
             >
-              {viewMode === 'table' && <TableView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} isAutoScrolling={isAutoScrolling} />}
-              {viewMode === 'calendar' && <CalendarView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} isAutoScrolling={isAutoScrolling} />}
-              {viewMode === 'task' && <TaskView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} isAutoScrolling={isAutoScrolling} />}
+              <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-blue-400" /></div>}>
+                {viewMode === 'table' && <TableView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} isAutoScrolling={isAutoScrolling} />}
+                {viewMode === 'calendar' && <CalendarView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} isAutoScrolling={isAutoScrolling} />}
+                {viewMode === 'task' && <TaskView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} isAutoScrolling={isAutoScrolling} />}
+              </Suspense>
             </motion.div>
           </AnimatePresence>
         </div>
       </main>
 
-      {selectedTask && <TaskDetailModal task={selectedTask} onClose={() => setSelectedTask(null)} />}
-      {previewUrl && <ExcelPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />}
-      {showSettings && (
-        <SettingsModal
-          onClose={() => setShowSettings(false)}
-          onSync={handleSyncWPS}
-          onGetToken={handleGetToken}
-          onRefreshToken={handleRefreshToken}
-          tokenStatus={tokenStatus}
-          isGettingToken={isGettingToken}
-          initialCode={autoCode}
-          tokenResponse={tokenResponse}
-          syncResponse={syncResponse}
-        />
-      )}
+      <AnimatePresence>
+        {selectedTask && (
+          <Suspense fallback={null}>
+            <TaskDetailModal task={selectedTask} onClose={() => setSelectedTask(null)} />
+          </Suspense>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {previewUrl && (
+          <Suspense fallback={null}>
+            <ExcelPreviewModal url={previewUrl} onClose={() => setPreviewUrl(null)} />
+          </Suspense>
+        )}
+      </AnimatePresence>
+      <AnimatePresence>
+        {showSettings && (
+          <Suspense fallback={null}>
+            <SettingsModal
+              onClose={() => setShowSettings(false)}
+              onSync={handleSyncWPS}
+              onGetToken={handleGetToken}
+              onRefreshToken={handleRefreshToken}
+              tokenStatus={tokenStatus}
+              isGettingToken={isGettingToken}
+              initialCode={autoCode}
+              tokenResponse={tokenResponse}
+              syncResponse={syncResponse}
+            />
+          </Suspense>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
