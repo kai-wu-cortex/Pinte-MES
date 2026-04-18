@@ -30,14 +30,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     if (body) {
-      if (typeof body === 'object' && !Array.isArray(body)) {
-        // For form-urlencoded body
-        fetchOptions.method = 'POST';
-        fetchOptions.body = new URLSearchParams(body);
-        (fetchOptions.headers as Record<string, string>)['Content-Type'] = 'application/x-www-form-urlencoded';
-      } else {
-        fetchOptions.method = 'GET';
-      }
+      // OAuth token request: body contains form parameters that need to be form-urlencoded
+      fetchOptions.method = 'POST';
+      fetchOptions.body = new URLSearchParams(body);
+      (fetchOptions.headers as Record<string, string>)['Content-Type'] = 'application/x-www-form-urlencoded';
+    } else {
+      // Spreadsheet data request: GET with query params already in endpoint, no body needed
+      fetchOptions.method = 'GET';
     }
 
     const response = await fetch(wpsUrl, fetchOptions);

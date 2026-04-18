@@ -177,6 +177,8 @@ export async function fetchTasksFromWps(
   const colTo = options?.colTo ?? 26;
   const apiBase = options?.apiBase || WPS_CONFIG.apiBase;
 
+  // API path requires: /v7/sheets/{file_id}/worksheets/{worksheet_id}/range_data
+  // Note: worksheet_id in URL path is snake_case (not camelCase worksheetId)
   const endpoint = `/v7/sheets/${encodeURIComponent(spreadsheetId)}/worksheets/${worksheetId}/range_data?row_from=${rowFrom}&row_to=${rowTo}&col_from=${colFrom}&col_to=${colTo}`;
 
   const isBrowser = typeof window !== 'undefined';
@@ -211,17 +213,51 @@ export async function fetchTasksFromWps(
     throw new Error(`Failed to fetch spreadsheet: ${response.statusText}`);
   }
 
-  const data = await response.json() as WpsSpreadsheetRangeResponse;
+  // Response format according to WPS docs:
+  // {
+  //   "code": 0,
+  //   "msg": "string",
+  //   "data": {
+  //     "range_data": [
+  //       { row_from, row_to, col_from, col_to, cell_text }
+  //     ]
+  //   }
+  // }
+  const fullResponse = await response.json();
 
-  if (!data.values || data.values.length <= 1) {
+  // Convert WPS response format to our expected row format
+  // Group cells by row - each row has row_from (same for all cells in the same row)
+  const rangeData = fullResponse?.data?.range_data || [];
+
+  if (!rangeData || rangeData.length === 0) {
+    // No data
+    return { tasks: [], rawData: fullResponse };
+  }
+
+  // Group cells by row
+  const rowsMap: { [rowFrom: number]: string[] } = {};
+  rangeData.forEach((cell: any) => {
+    const rowKey = cell.row_from;
+    if (!rowsMap[rowKey]) {
+      rowsMap[rowKey] = [];
+    }
+    // Ensure cells are ordered by column index
+    rowsMap[rowKey][cell.col_from - 1] = cell.cell_text || '';
+  });
+
+  // Convert to rows array (ordered by row number)
+  const sortedRowKeys = Object.keys(rowsMap).map(Number).sort((a, b) => a - b);
+  const rows: string[][] = sortedRowKeys.map(key => rowsMap[key]);
+
+  if (rows.length <= 1) {
     // No data or only header row
-    return { tasks: [], rawData: data };
+    return { tasks: [], rawData: fullResponse };
   }
 
   // Assume first row is header, skip it
-  const rows = data.values.slice(1);
-  const tasks = rows.map((row, index) => convertWpsRowToTask(row, index));
-  return { tasks, rawData: data };
+  const dataRows = rows.slice(1);
+  const tasks = dataRows.map((row, index) => convertWpsRowToTask(row, index));
+  return { tasks, rawData: fullResponse };
 }
 
 /**
