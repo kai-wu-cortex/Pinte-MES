@@ -170,7 +170,7 @@ export async function fetchTasksFromWps(
     throw new Error('WPS spreadsheet ID not configured');
   }
 
-  const worksheetId = options?.worksheetId ?? 0;
+  const worksheetId = options?.worksheetId ?? 1;
   const rowFrom = options?.rowFrom ?? 1;
   const rowTo = options?.rowTo ?? 1000;
   const colFrom = options?.colFrom ?? 1;
