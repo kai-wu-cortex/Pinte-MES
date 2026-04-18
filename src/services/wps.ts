@@ -177,9 +177,9 @@ export async function fetchTasksFromWps(
   const colTo = options?.colTo ?? 26;
   const apiBase = options?.apiBase || WPS_CONFIG.apiBase;
 
-  // API path requires: /v7/sheet/{file_id}/worksheets/{worksheet_id}/range_data
+  // API path requires: /api/v7/sheet/{file_id}/worksheets/{worksheet_id}/range_data
   // Note: worksheet_id in URL path is snake_case (not camelCase worksheetId), sheet is singular (not sheets)
-  const endpoint = `/v7/sheet/${encodeURIComponent(spreadsheetId)}/worksheets/${worksheetId}/range_data?row_from=${rowFrom}&row_to=${rowTo}&col_from=${colFrom}&col_to=${colTo}`;
+  const endpoint = `/api/v7/sheet/${encodeURIComponent(spreadsheetId)}/worksheets/${worksheetId}/range_data?row_from=${rowFrom}&row_to=${rowTo}&col_from=${colFrom}&col_to=${colTo}`;
 
   const isBrowser = typeof window !== 'undefined';
   let response;
