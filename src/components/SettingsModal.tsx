@@ -129,7 +129,7 @@ export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tok
           </button>
         </div>
 
-        <div className="p-6 space-y-4 max-h-[calc(100vh-180px] overflow-y-auto">
+        <div className="p-6 space-y-4 max-h-[calc(100vh-180px)] overflow-y-auto">
           <div>
             <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1.5">
               <LinkIcon className="w-3.5 h-3.5" /> API 地址
