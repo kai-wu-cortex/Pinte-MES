@@ -263,9 +263,9 @@ export async function fetchTasksFromWps(
 /**
  * Convert WPS spreadsheet row to application Task type
  * Expected columns (adjust based on actual spreadsheet):
- * 0: machineName (机台)
- * 1: id (流程卡号)
- * 2: process (工艺)
+ * 0: process (工艺)
+ * 1: machineName (机台)
+ * 2: id (流程卡号)
  * 3: fileUrl (电子流程卡 - WPS文件ID)
  * 4: productName (品名颜色)
  * 5: specification (规格)
@@ -281,9 +281,9 @@ export async function fetchTasksFromWps(
  */
 function convertWpsRowToTask(row: string[], index: number): Task {
   const [
-    machineName = '',
-    id = `TC-${Date.now() + index}`,
     process = '',
+    machineName = '',
+    id = '',
     fileUrl = '',
     productName = '',
     specification = '',
