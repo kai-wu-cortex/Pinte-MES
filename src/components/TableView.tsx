@@ -104,12 +104,12 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
   const handleResizeStart = (e: React.MouseEvent, colId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     const startX = e.clientX;
     const startWidth = colWidths[colId] || 100;
 
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const newWidth = Math.max(60, startWidth + (moveEvent.clientX - startX));
+      const newWidth = Math.max(0, startWidth + (moveEvent.clientX - startX));
       setColWidths(prev => ({ ...prev, [colId]: newWidth }));
     };
 
@@ -314,10 +314,10 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
                           className="hover:bg-slate-800/80 transition-colors group cursor-pointer"
                         >
                           {orderedColumns.map(col => visibleCols.has(col.id) && (
-                            <td 
+                            <td
                               key={col.id}
-                              className={cn(cellClass, col.id === 'notes' ? "whitespace-normal break-words min-w-[200px]" : "truncate", col.id === 'id' && "text-blue-400 font-mono cursor-pointer hover:underline")}
-                              onClick={(e) => { 
+                              className={cn(cellClass, "whitespace-normal break-words", col.id === 'notes' ? "min-w-[200px]" : "", col.id === 'id' && "text-blue-400 font-mono cursor-pointer hover:underline")}
+                              onClick={(e) => {
                                 if (col.id === 'id') { e.stopPropagation(); onProcessCardClick(task.fileUrl || ''); }
                               }}
                             >
