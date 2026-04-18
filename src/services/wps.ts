@@ -319,7 +319,7 @@ function convertWpsRowToTask(row: string[], index: number): Task {
   };
 
   return {
-    id: (id || '').trim() || `TC-${Date.now() + index}`,
+    id: (id || '').trim(),
     process: (process || '').trim(),
     machineId,
     machineName: resolvedMachineName,
