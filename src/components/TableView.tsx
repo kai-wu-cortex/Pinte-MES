@@ -186,7 +186,7 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
     const handleMouseMove = (moveEvent: MouseEvent) => {
       moveEvent.preventDefault();
       const deltaX = moveEvent.clientX - startX;
-      const newWidth = Math.max(0, startWidth + deltaX);
+      const newWidth = Math.max(30, startWidth + deltaX);
       setColWidths(prev => ({ ...prev, [colId]: newWidth }));
     };
 
@@ -419,7 +419,7 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
       <div className="flex-1 overflow-auto relative">
         <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
           <SortableContext items={orderedColumns.map(c => c.id)} strategy={horizontalListSortingStrategy}>
-            <table className="w-full text-left text-slate-300 min-w-max">
+            <table className="w-full text-left text-slate-300 min-w-max table-fixed">
               <thead className="text-xs text-blue-300 uppercase bg-slate-800/80 sticky top-0 z-10 shadow-sm">
                 <tr>
                   {orderedColumns.map(col => visibleCols.has(col.id) && (
