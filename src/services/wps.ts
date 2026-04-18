@@ -302,22 +302,35 @@ function convertWpsRowToTask(row: string[], index: number): Task {
   const machineId = machine?.id || `M-${Date.now() + index}`;
   const resolvedMachineName = machine?.name || trimmedMachineName;
 
+  // Safe date parsing - handle invalid dates gracefully
+  const parseDate = (dateStr: string): string => {
+    const trimmed = (dateStr || '').trim();
+    if (!trimmed) {
+      return new Date().toISOString();
+    }
+    const date = new Date(trimmed);
+    if (isNaN(date.getTime())) {
+      return new Date().toISOString();
+    }
+    return date.toISOString();
+  };
+
   return {
-    id: id.trim(),
-    process: process.trim(),
+    id: (id || '').trim() || `TC-${Date.now() + index}`,
+    process: (process || '').trim(),
     machineId,
     machineName: resolvedMachineName,
-    productName: productName.trim(),
-    specification: specification.trim(),
+    productName: (productName || '').trim(),
+    specification: (specification || '').trim(),
     plannedQuantity: Number(plannedQuantity) || 0,
     actualOutput: Number(actualOutput) || 0,
     slittingQuantity: Number(slittingQuantity) || 0,
     shippedQuantity: Number(shippedQuantity) || 0,
-    startTime: new Date(startTime.trim()).toISOString(),
-    endTime: new Date(endTime.trim()).toISOString(),
-    operator: operator.trim(),
-    notes: notes.trim(),
-    fileUrl: fileUrl.trim() || undefined,
+    startTime: parseDate(startTime),
+    endTime: parseDate(endTime),
+    operator: (operator || '').trim(),
+    notes: (notes || '').trim(),
+    fileUrl: (fileUrl || '').trim() || undefined,
   };
 }
 
