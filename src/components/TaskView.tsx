@@ -6,6 +6,47 @@ import { Clock, User, Settings, FileText, LayoutGrid, Settings2, Check, Hash, Bo
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
+type FilterOperator = 'contains' | 'notContains' | 'equals' | 'notEquals' | 'startsWith' | 'endsWith' | 'isEmpty' | 'isNotEmpty';
+
+interface FilterConfig {
+  operator: FilterOperator;
+  value: string;
+}
+
+const OPERATOR_LABELS: Record<FilterOperator, string> = {
+  contains: '包含',
+  notContains: '不包含',
+  equals: '等于',
+  notEquals: '不等于',
+  startsWith: '开头是',
+  endsWith: '结尾是',
+  isEmpty: '为空',
+  isNotEmpty: '不为空',
+};
+
+function matchesFilter(value: string, operator: FilterOperator, filterValue: string): boolean {
+  const v = value.toLowerCase();
+  const f = filterValue.toLowerCase();
+  switch (operator) {
+    case 'contains':
+      return v.includes(f);
+    case 'notContains':
+      return !v.includes(f);
+    case 'equals':
+      return v === f;
+    case 'notEquals':
+      return v !== f;
+    case 'startsWith':
+      return v.startsWith(f);
+    case 'endsWith':
+      return v.endsWith(f);
+    case 'isEmpty':
+      return v === '';
+    case 'isNotEmpty':
+      return v !== '';
+  }
+}
+
 interface TaskViewProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
@@ -119,7 +160,31 @@ export function TaskView({ tasks, onTaskClick, onProcessCardClick, isAutoScrolli
   const [showSizeMenu, setShowSizeMenu] = useState(false);
   const [showGroupMenu, setShowGroupMenu] = useState(false);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
-  const [filters, setFilters] = useLocalStorage<Record<string, string>>('mes_task_filters', {});
+
+  // Migrate old filter format (string) to new format ({operator, value})
+  const getInitialFilters = (): Record<string, FilterConfig> => {
+    try {
+      const item = window.localStorage.getItem('mes_task_filters');
+      if (!item) return {};
+      const parsed = JSON.parse(item);
+      if (!parsed || typeof parsed === 'string' || Array.isArray(parsed)) {
+        return {};
+      }
+      const result: Record<string, FilterConfig> = {};
+      for (const [key, value] of Object.entries(parsed)) {
+        if (typeof value === 'string') {
+          result[key] = { operator: 'contains', value };
+        } else {
+          result[key] = value as FilterConfig;
+        }
+      }
+      return result;
+    } catch {
+      return {};
+    }
+  };
+
+  const [filters, setFilters] = useLocalStorage<Record<string, FilterConfig>>('mes_task_filters', getInitialFilters());
 
   const clearFilter = (fieldId: string) => {
     const newFilters = { ...filters };
@@ -130,13 +195,16 @@ export function TaskView({ tasks, onTaskClick, onProcessCardClick, isAutoScrolli
   // Apply all filters before grouping
   const filteredTasks = useMemo(() => {
     let result = tasks;
-    const filterEntries = Object.entries(filters).filter(([_, value]) => value.trim() !== '');
+    const filterEntries = Object.entries(filters).filter(([_, config]) => {
+      return config.operator === 'isEmpty' || config.operator === 'isNotEmpty' || config.value.trim() !== '';
+    });
     if (filterEntries.length === 0) return result;
 
     return result.filter(task => {
-      return filterEntries.every(([fieldId, filterValue]) => {
-        const value = String(task[fieldId as keyof Task] || '').toLowerCase();
-        return value.includes(filterValue.trim().toLowerCase());
+      return filterEntries.every(([fieldId, config]) => {
+        const { operator, value: filterValue } = config;
+        const cellValue = String(task[fieldId as keyof Task] || '');
+        return matchesFilter(cellValue, operator, filterValue);
       });
     });
   }, [tasks, filters]);
@@ -191,41 +259,69 @@ export function TaskView({ tasks, onTaskClick, onProcessCardClick, isAutoScrolli
           {showFilterMenu && (
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowFilterMenu(false)} />
-              <div className="absolute right-0 top-full mt-1 z-50 w-64 bg-slate-800 border border-blue-900/50 rounded-lg shadow-xl py-2 overflow-hidden max-h-80 overflow-y-auto">
-                {TASK_FIELDS.filter(f => f.id !== 'time').map(field => (
-                  <div key={field.id} className="px-3 py-2">
-                    <label className="block text-xs text-slate-300 mb-1">{field.label}</label>
-                    <div className="relative">
-                      <input
-                        type="text"
-                        value={filters[field.id] || ''}
-                        onChange={(e) => {
-                          const value = e.target.value;
-                          if (value) {
-                            setFilters({ ...filters, [field.id]: value });
-                          } else {
-                            const newFilters = { ...filters };
-                            delete newFilters[field.id];
-                            setFilters(newFilters);
-                          }
-                        }}
-                        placeholder={`筛选${field.label}...`}
-                        className={cn(
-                          "w-full bg-slate-900 border rounded px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500",
-                          filters[field.id] ? "border-blue-400" : "border-slate-700"
-                        )}
-                      />
-                      {filters[field.id] && (
-                        <button
-                          onClick={() => clearFilter(field.id)}
-                          className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              <div className="absolute right-0 top-full mt-1 z-50 w-72 bg-slate-800 border border-blue-900/50 rounded-lg shadow-xl py-2 overflow-hidden max-h-80 overflow-y-auto">
+                {TASK_FIELDS.filter(f => f.id !== 'time').map(field => {
+                  const config = filters[field.id];
+                  const currentValue = config?.value || '';
+                  const currentOperator = config?.operator || 'contains';
+                  return (
+                    <div key={field.id} className="px-3 py-2">
+                      <label className="block text-xs text-slate-300 mb-1.5">{field.label}</label>
+                      <div className="flex gap-1.5 mb-1.5">
+                        <select
+                          value={currentOperator}
+                          onChange={(e) => {
+                            const operator = e.target.value as FilterOperator;
+                            if (!currentValue && !['isEmpty', 'isNotEmpty'].includes(operator)) {
+                              const newFilters = { ...filters };
+                              delete newFilters[field.id];
+                              setFilters(newFilters);
+                            } else {
+                              setFilters({ ...filters, [field.id]: { operator, value: currentValue } });
+                            }
+                          }}
+                          className="w-28 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-slate-200 focus:outline-none focus:border-blue-500"
                         >
-                          <FilterX className="w-3 h-3" />
-                        </button>
-                      )}
+                          {(Object.entries(OPERATOR_LABELS) as [FilterOperator, string][]).map(([op, label]) => (
+                            <option key={op} value={op}>{label}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="relative">
+                        {!['isEmpty', 'isNotEmpty'].includes(currentOperator) && (
+                          <input
+                            type="text"
+                            value={currentValue}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              const operator = currentOperator;
+                              if (value || operator === 'isEmpty' || operator === 'isNotEmpty') {
+                                setFilters({ ...filters, [field.id]: { operator, value } });
+                              } else {
+                                const newFilters = { ...filters };
+                                delete newFilters[field.id];
+                                setFilters(newFilters);
+                              }
+                            }}
+                            placeholder={`筛选${field.label}...`}
+                            className={cn(
+                              "w-full bg-slate-900 border rounded px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500",
+                              filters[field.id] ? "border-blue-400" : "border-slate-700"
+                            )}
+                          />
+                        )}
+                        {filters[field.id] && !['isEmpty', 'isNotEmpty'].includes(currentOperator) && (
+                          <button
+                            onClick={() => clearFilter(field.id)}
+                            className="absolute right-1 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                          >
+                            <FilterX className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           )}

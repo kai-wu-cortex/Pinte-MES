@@ -1,13 +1,54 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { format } from 'date-fns';
 import { Task } from '../types';
 import { cn } from './MetricCard';
-import { Columns, Rows, Check, ListTree, ChevronDown, ChevronRight, GripVertical, FilterX } from 'lucide-react';
+import { Columns, Rows, Check, ListTree, ChevronDown, ChevronRight, GripVertical, FilterX, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { useAutoScroll } from '../hooks/useAutoScroll';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+
+type FilterOperator = 'contains' | 'notContains' | 'equals' | 'notEquals' | 'startsWith' | 'endsWith' | 'isEmpty' | 'isNotEmpty';
+
+interface FilterConfig {
+  operator: FilterOperator;
+  value: string;
+}
+
+function matchesFilter(value: string, operator: FilterOperator, filterValue: string): boolean {
+  const v = value.toLowerCase();
+  const f = filterValue.toLowerCase();
+  switch (operator) {
+    case 'contains':
+      return v.includes(f);
+    case 'notContains':
+      return !v.includes(f);
+    case 'equals':
+      return v === f;
+    case 'notEquals':
+      return v !== f;
+    case 'startsWith':
+      return v.startsWith(f);
+    case 'endsWith':
+      return v.endsWith(f);
+    case 'isEmpty':
+      return v === '';
+    case 'isNotEmpty':
+      return v !== '';
+  }
+}
+
+const OPERATOR_LABELS: Record<FilterOperator, string> = {
+  contains: '包含',
+  notContains: '不包含',
+  equals: '等于',
+  notEquals: '不等于',
+  startsWith: '开头是',
+  endsWith: '结尾是',
+  isEmpty: '为空',
+  isNotEmpty: '不为空',
+};
 
 interface TableViewProps {
   tasks: Task[];
@@ -48,12 +89,39 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
   const [showGroupMenu, setShowGroupMenu] = useState(false);
   const [groupBy, setGroupBy] = useLocalStorage<string>('mes_table_groupBy', 'none');
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [filters, setFilters] = useLocalStorage<Record<string, string>>('mes_table_filters', {});
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useLocalStorage<number | 'all'>('mes_table_pageSize', 50);
+
+  // Migrate old filter format (string) to new format ({operator, value})
+  const getInitialFilters = (): Record<string, FilterConfig> => {
+    try {
+      const item = window.localStorage.getItem('mes_table_filters');
+      if (!item) return {};
+      const parsed = JSON.parse(item);
+      if (!parsed || typeof parsed === 'string' || Array.isArray(parsed)) {
+        return {};
+      }
+      const result: Record<string, FilterConfig> = {};
+      for (const [key, value] of Object.entries(parsed)) {
+        if (typeof value === 'string') {
+          result[key] = { operator: 'contains', value };
+        } else {
+          result[key] = value as FilterConfig;
+        }
+      }
+      return result;
+    } catch {
+      return {};
+    }
+  };
+
+  const [filters, setFilters] = useLocalStorage<Record<string, FilterConfig>>('mes_table_filters', getInitialFilters());
 
   const clearFilter = (colId: string) => {
     const newFilters = { ...filters };
     delete newFilters[colId];
     setFilters(newFilters);
+    setCurrentPage(1);
   };
 
   const toggleCol = (id: string) => {
@@ -108,12 +176,20 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
     const startX = e.clientX;
     const startWidth = colWidths[colId] || 100;
 
+    // Prevent text selection during drag
+    const originalUserSelect = document.body.style.userSelect;
+    document.body.style.userSelect = 'none';
+
     const handleMouseMove = (moveEvent: MouseEvent) => {
-      const newWidth = Math.max(0, startWidth + (moveEvent.clientX - startX));
+      moveEvent.preventDefault();
+      const deltaX = moveEvent.clientX - startX;
+      const newWidth = Math.max(0, startWidth + deltaX);
       setColWidths(prev => ({ ...prev, [colId]: newWidth }));
     };
 
     const handleMouseUp = () => {
+      // Restore text selection
+      document.body.style.userSelect = originalUserSelect;
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
     };
@@ -151,16 +227,30 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
   // Apply all column filters before grouping
   const filteredTasks = useMemo(() => {
     let result = tasks;
-    const filterEntries = Object.entries(filters).filter(([_, value]) => value.trim() !== '');
+    const filterEntries = Object.entries(filters).filter(([_, config]) => {
+      // For isEmpty/isNotEmpty, we don't need a value - still apply filter
+      return config.operator === 'isEmpty' || config.operator === 'isNotEmpty' || config.value.trim() !== '';
+    });
     if (filterEntries.length === 0) return result;
 
     return result.filter(task => {
-      return filterEntries.every(([colId, filterValue]) => {
-        const value = String(task[colId as keyof Task] || '').toLowerCase();
-        return value.includes(filterValue.trim().toLowerCase());
+      return filterEntries.every(([colId, config]) => {
+        const { operator, value: filterValue } = config;
+        const cellValue = String(task[colId as keyof Task] || '');
+        return matchesFilter(cellValue, operator, filterValue);
       });
     });
   }, [tasks, filters]);
+
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filters]);
+
+  // Reset page when page size changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pageSize]);
 
   const groupedTasks = React.useMemo<Record<string, Task[]>>(() => {
     if (groupBy === 'none') return { '所有任务': filteredTasks };
@@ -172,6 +262,52 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
     });
     return groups;
   }, [filteredTasks, groupBy]);
+
+  // Apply pagination to the grouped tasks
+  const paginatedGroupedTasks = useMemo(() => {
+    if (pageSize === 'all') {
+      return groupedTasks;
+    }
+
+    // If grouped, we need to paginate across all groups? No - pagination applies to total rows regardless of grouping
+    const allTasks: { groupName: string; task: Task; isGroupHeader: boolean }[] = [];
+    (Object.entries(groupedTasks) as [string, Task[]][]).forEach(([groupName, groupTasks]) => {
+      if (groupBy !== 'none') {
+        allTasks.push({ groupName, task: null as any, isGroupHeader: true });
+      }
+      groupTasks.forEach(task => {
+        allTasks.push({ groupName, task, isGroupHeader: false });
+      });
+    });
+
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedItems = allTasks.slice(startIndex, endIndex);
+
+    // Re-group the paginated items
+    const result: Record<string, Task[]> = {};
+    paginatedItems.forEach(item => {
+      if (!item.isGroupHeader) {
+        if (!result[item.groupName]) {
+          result[item.groupName] = [];
+        }
+        result[item.groupName].push(item.task);
+      }
+    });
+
+    // If grouping is none, just return the paginated array
+    if (groupBy === 'none') {
+      return { '所有任务': filteredTasks.slice(startIndex, endIndex) };
+    }
+
+    return result;
+  }, [groupedTasks, filteredTasks, currentPage, pageSize, groupBy]);
+
+  const totalFilteredRows = useMemo(() => {
+    return (Object.values(groupedTasks) as Task[][]).reduce((sum, tasks) => sum + tasks.length, 0);
+  }, [groupedTasks]);
+
+  const totalPages = pageSize === 'all' ? 1 : Math.ceil(totalFilteredRows / pageSize);
 
   return (
     <div className="w-full h-full flex flex-col rounded-xl border border-blue-900/50 bg-slate-900/50 backdrop-blur-sm overflow-hidden">
@@ -288,13 +424,13 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
                 </tr>
               </thead>
               <tbody className="divide-y divide-blue-900/30">
-                {(Object.entries(groupedTasks) as [string, Task[]][]).map(([groupName, groupTasks]) => {
+                {(Object.entries(paginatedGroupedTasks) as [string, Task[]][]).map(([groupName, groupTasks]) => {
                   const isExpanded = groupBy === 'none' || expandedGroups.has(groupName);
-                  
+
                   return (
                     <React.Fragment key={groupName}>
                       {groupBy !== 'none' && (
-                        <tr 
+                        <tr
                           className="bg-slate-800/90 border-y border-blue-900/50 cursor-pointer hover:bg-slate-700/80 transition-colors"
                           onClick={() => toggleGroup(groupName)}
                         >
@@ -308,8 +444,8 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
                         </tr>
                       )}
                       {isExpanded && groupTasks.map((task) => (
-                        <tr 
-                          key={task.id} 
+                        <tr
+                          key={task.id}
                           onClick={() => onTaskClick(task)}
                           className="hover:bg-slate-800/80 transition-colors group cursor-pointer"
                         >
@@ -333,6 +469,70 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick, isAutoScroll
             </table>
           </SortableContext>
         </DndContext>
+        {/* Pagination Controls */}
+        {pageSize !== 'all' && totalPages > 1 && (
+          <div className="sticky bottom-0 bg-slate-800/90 border-t border-blue-900/50 px-4 py-3 flex items-center justify-between mt-2 backdrop-blur-md">
+            <div className="text-xs text-slate-400">
+              显示 {(currentPage - 1) * pageSize + 1} - {Math.min(currentPage * pageSize, totalFilteredRows)} 共 {totalFilteredRows} 条
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1 mr-4">
+                <span className="text-xs text-slate-400">每页:</span>
+                <select
+                  value={pageSize}
+                  onChange={(e) => setPageSize(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                  className="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-blue-500"
+                >
+                  <option value={10}>10</option>
+                  <option value={20}>20</option>
+                  <option value={50}>50</option>
+                  <option value={100}>100</option>
+                  <option value="all">全部</option>
+                </select>
+              </div>
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage <= 1}
+                className="p-1.5 rounded border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum: number;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (currentPage <= 3) {
+                  pageNum = i + 1;
+                } else if (currentPage >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = currentPage - 2 + i;
+                }
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setCurrentPage(pageNum)}
+                    className={cn(
+                      "w-8 h-8 flex items-center justify-center rounded text-xs font-medium border transition-colors",
+                      currentPage === pageNum
+                        ? "bg-blue-600 border-blue-600 text-white"
+                        : "border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-700"
+                    )}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage >= totalPages}
+                className="p-1.5 rounded border border-slate-700 bg-slate-900 text-slate-300 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <ChevronRightIcon className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -356,17 +556,21 @@ function SortableMenuItem({ col, visibleCols, toggleCol }: any) {
 
 function SortableHeader({ col, spacing, colWidths, handleResizeStart, filters, setFilters }: any) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: col.id });
+  const [showOperatorMenu, setShowOperatorMenu] = useState(false);
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     width: colWidths[col.id]
   };
-  const currentFilter = filters[col.id] || '';
+  const currentConfig = filters[col.id];
+  const currentValue = currentConfig?.value || '';
+  const currentOperator = currentConfig?.operator || 'contains';
 
-  const handleFilterChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleValueChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    if (value) {
-      setFilters({ ...filters, [col.id]: value });
+    const operator = currentOperator || 'contains';
+    if (value || operator === 'isEmpty' || operator === 'isNotEmpty') {
+      setFilters({ ...filters, [col.id]: { operator, value } });
     } else {
       const newFilters = { ...filters };
       delete newFilters[col.id];
@@ -374,31 +578,75 @@ function SortableHeader({ col, spacing, colWidths, handleResizeStart, filters, s
     }
   };
 
+  const handleOperatorChange = (operator: FilterOperator) => {
+    const newValue = { operator, value: currentValue };
+    if (!currentValue && !['isEmpty', 'isNotEmpty'].includes(operator)) {
+      const newFilters = { ...filters };
+      delete newFilters[col.id];
+      setFilters(newFilters);
+    } else {
+      setFilters({ ...filters, [col.id]: newValue });
+    }
+    setShowOperatorMenu(false);
+  };
+
+  const hasActiveFilter = !!currentConfig;
+
   return (
     <th
       ref={setNodeRef}
       style={style}
       className={cn("font-medium border-b border-blue-900/50 bg-slate-800/90 backdrop-blur-md relative group select-none", spacingStyles[spacing])}
     >
-      <div className="flex flex-col">
-        <div className="flex items-center gap-2">
+      {showOperatorMenu && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setShowOperatorMenu(false)} />
+          <div className="absolute left-0 top-full mt-1 z-50 w-32 bg-slate-800 border border-blue-900/50 rounded-lg shadow-xl py-1 overflow-hidden">
+            {(Object.entries(OPERATOR_LABELS) as [FilterOperator, string][]).map(([op, label]) => (
+              <button
+                key={op}
+                onClick={() => handleOperatorChange(op)}
+                className="w-full text-left px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-700 hover:text-white flex items-center justify-between"
+              >
+                {label}
+                {currentOperator === op && <Check className="w-3 h-3 text-blue-400" />}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      <div className="flex flex-col gap-1">
+        <div className="flex items-center gap-1">
           <div {...attributes} {...listeners} className="cursor-grab">
             <GripVertical className="w-3 h-3 text-slate-500" />
           </div>
-          <div className="truncate pr-4 font-medium">{col.label}</div>
-        </div>
-        <div className="relative mt-1">
-          <input
-            type="text"
-            value={currentFilter}
-            onChange={handleFilterChange}
-            placeholder={`筛选...`}
+          <button
+            onClick={() => setShowOperatorMenu(!showOperatorMenu)}
             className={cn(
-              "w-full bg-slate-900/80 border rounded px-2 py-0.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500",
-              currentFilter ? "border-blue-400" : "border-slate-700"
+              "text-[9px] px-1 py-0.5 rounded border transition-colors",
+              currentConfig
+                ? "bg-blue-900/30 border-blue-500/50 text-blue-300"
+                : "border-transparent text-slate-400 hover:border-slate-600 hover:text-slate-200"
             )}
-          />
-          {currentFilter && (
+          >
+            {OPERATOR_LABELS[currentOperator]}
+          </button>
+          <div className="truncate flex-1 font-medium">{col.label}</div>
+        </div>
+        <div className="relative">
+          {!['isEmpty', 'isNotEmpty'].includes(currentOperator) && (
+            <input
+              type="text"
+              value={currentValue}
+              onChange={handleValueChange}
+              placeholder={`筛选...`}
+              className={cn(
+                "w-full bg-slate-900/80 border rounded px-2 py-0.5 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-blue-500",
+                hasActiveFilter ? "border-blue-400" : "border-slate-700"
+              )}
+            />
+          )}
+          {hasActiveFilter && (
             <button
               onClick={() => {
                 const newFilters = { ...filters };
