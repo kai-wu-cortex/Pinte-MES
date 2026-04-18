@@ -15,7 +15,7 @@ export interface WpsAccessTokenResponse {
   expires_in: number;
   token_type: string;
   refresh_token: string;
-  refresh_expires_in: number;
+  refresh_expires_in: string;
 }
 
 // Cached access token with expiration
@@ -75,7 +75,7 @@ export async function getWpsAccessToken(
       access_token: cachedToken.access_token,
       refresh_token: cachedToken.refresh_token,
       expires_in: Math.floor((cachedToken.expiresAt - Date.now()) / 1000),
-      refresh_expires_in: 0,
+      refresh_expires_in: '0',
       token_type: 'bearer',
     };
   }
