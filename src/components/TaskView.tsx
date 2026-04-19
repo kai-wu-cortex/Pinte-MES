@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import { Task } from '../types';
 import { cn } from './MetricCard';
 import { format } from 'date-fns';
-import { Clock, User, Settings, FileText, LayoutGrid, Settings2, Check, Hash, Box, Activity, ListTree, FilterX } from 'lucide-react';
+import { Calendar, Clock, User, Settings, FileText, LayoutGrid, Settings2, Check, Hash, Box, Activity, ListTree, FilterX } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 type FilterOperator = 'contains' | 'notContains' | 'equals' | 'notEquals' | 'startsWith' | 'endsWith' | 'isEmpty' | 'isNotEmpty';
@@ -53,6 +53,7 @@ interface TaskViewProps {
 }
 
 const TASK_FIELDS = [
+  { id: 'startTime', label: '日期', icon: Calendar },
   { id: 'id', label: '流程卡号', icon: Hash },
   { id: 'process', label: '工艺', icon: Settings },
   { id: 'machineName', label: '机台', icon: Settings },
@@ -64,7 +65,6 @@ const TASK_FIELDS = [
   { id: 'shippedQuantity', label: '实际出货数量', icon: Activity },
   { id: 'operator', label: '操作员', icon: User },
   { id: 'notes', label: '工艺备注', icon: FileText },
-  { id: 'time', label: '计划时间', icon: Clock },
 ];
 
 interface TaskCardProps {
@@ -150,7 +150,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onProcessCardClick, 
 
 export function TaskView({ tasks, onTaskClick, onProcessCardClick }: TaskViewProps) {
   const [cardSize, setCardSize] = useLocalStorage<'sm' | 'md' | 'lg'>('mes_task_cardSize', 'md');
-  const [visibleFieldsArr, setVisibleFieldsArr] = useLocalStorage<string[]>('mes_task_visibleFields', ['id', 'productName', 'machineName', 'operator', 'time']);
+  const [visibleFieldsArr, setVisibleFieldsArr] = useLocalStorage<string[]>('mes_task_visibleFields', ['startTime', 'id', 'productName', 'machineName', 'operator']);
   const [groupBy, setGroupBy] = useLocalStorage<string>('mes_task_groupBy', 'none');
   const visibleFields = new Set(visibleFieldsArr);
   const [showFieldMenu, setShowFieldMenu] = useState(false);
@@ -257,7 +257,7 @@ export function TaskView({ tasks, onTaskClick, onProcessCardClick }: TaskViewPro
             <>
               <div className="fixed inset-0 z-40" onClick={() => setShowFilterMenu(false)} />
               <div className="absolute right-0 top-full mt-1 z-50 w-72 bg-slate-800 border border-blue-900/50 rounded-lg shadow-xl py-2 overflow-hidden max-h-80 overflow-y-auto">
-                {TASK_FIELDS.filter(f => f.id !== 'time').map(field => {
+                {TASK_FIELDS.map(field => {
                   const config = filters[field.id];
                   const currentValue = config?.value || '';
                   const currentOperator = config?.operator || 'contains';
@@ -343,7 +343,7 @@ export function TaskView({ tasks, onTaskClick, onProcessCardClick }: TaskViewPro
                   不分组
                   {groupBy === 'none' && <Check className="w-3.5 h-3.5 text-blue-400" />}
                 </button>
-                {TASK_FIELDS.filter(f => f.id !== 'notes' && f.id !== 'time').map(field => (
+                {TASK_FIELDS.filter(f => f.id !== 'notes').map(field => (
                   <button
                     key={field.id}
                     onClick={() => { setGroupBy(field.id); setShowGroupMenu(false); }}
