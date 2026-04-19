@@ -463,4 +463,33 @@ export async function getCellAttachments(
   return fullResponse?.data || { attachments: [] };
 }
 
+/**
+ * Sync tasks from WPS spreadsheet - complete sync flow with token refresh
+ */
+export async function syncTasksFromWps(
+  config?: {
+    appId: string;
+    appKey: string;
+    apiUrl: string;
+    fileId: string;
+    worksheetId?: number;
+    rowFrom?: number;
+    rowTo?: number;
+    colFrom?: number;
+    colTo?: number;
+  }
+): Promise<{ tasks: Task[]; rawData: any }> {
+  const token = await getWpsAccessToken(undefined, config);
+  const result = await fetchTasksFromWps(token.access_token, {
+    spreadsheetId: config?.fileId,
+    worksheetId: config?.worksheetId,
+    rowFrom: config?.rowFrom,
+    rowTo: config?.rowTo,
+    colFrom: config?.colFrom,
+    colTo: config?.colTo,
+    apiBase: config?.apiUrl,
+  });
+  return result;
+}
+
 export { WPS_CONFIG };

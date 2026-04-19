@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
 import { MetricCard } from './components/MetricCard';
 import { INITIAL_TASKS, MACHINES } from './data';
-import { fetchTasksFromWps, getWpsAccessToken, getCellAttachments, cachedToken } from './services/wps';
+import { fetchTasksFromWps, getWpsAccessToken, getCellAttachments, cachedToken, syncTasksFromWps } from './services/wps';
 import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Search, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { cn } from './components/MetricCard';
@@ -112,8 +112,8 @@ export default function App() {
     setPreviewTask(task);
   };
 
-  // Common sync logic from WPS
-  const syncTasksFromWps = useCallback(async (config?: {
+  // Common sync logic from WPS (delegates to wps service)
+  const handleSyncTasksFromWps = useCallback(async (config?: {
     appId: string;
     appKey: string;
     apiUrl: string;
@@ -127,16 +127,7 @@ export default function App() {
     const prevTaskCount = tasks.length;
     try {
       setIsSyncing(true);
-      const token = await getWpsAccessToken(undefined, config);
-      const { tasks: wpsTasks, rawData } = await fetchTasksFromWps(token.access_token, {
-        spreadsheetId: config?.fileId,
-        worksheetId: config?.worksheetId,
-        rowFrom: config?.rowFrom,
-        rowTo: config?.rowTo,
-        colFrom: config?.colFrom,
-        colTo: config?.colTo,
-        apiBase: config?.apiUrl,
-      });
+      const { tasks: wpsTasks, rawData } = await syncTasksFromWps(config);
       setSyncResponse(JSON.stringify(rawData, null, 2));
       if (wpsTasks.length > 0) {
         setTasks(wpsTasks);
@@ -162,7 +153,7 @@ export default function App() {
 
   const handleSyncWPS = async (config: any): Promise<void> => {
     setSyncResponse('');
-    await syncTasksFromWps(config);
+    await handleSyncTasksFromWps(config);
   };
 
   // Get access token with authorization code
@@ -228,7 +219,7 @@ export default function App() {
       // Only auto-sync if WPS is configured
       if (import.meta.env.VITE_WPS_APP_ID && import.meta.env.VITE_WPS_SPREADSHEET_ID) {
         try {
-          await syncTasksFromWps();
+          await handleSyncTasksFromWps();
           console.log('Auto-sync completed on startup');
         } catch (err) {
           console.error('Auto WPS sync failed, using initial/cached data:', err);
@@ -245,7 +236,7 @@ export default function App() {
     const timer = setInterval(async () => {
       if (import.meta.env.VITE_WPS_APP_ID && import.meta.env.VITE_WPS_SPREADSHEET_ID) {
         try {
-          await syncTasksFromWps();
+          await handleSyncTasksFromWps();
           console.log('Periodic auto-sync completed');
         } catch (err) {
           console.error('Periodic WPS sync failed:', err);
@@ -254,7 +245,7 @@ export default function App() {
       }
     }, AUTO_SYNC_INTERVAL);
     return () => clearInterval(timer);
-  }, [syncTasksFromWps]);
+  }, [handleSyncTasksFromWps]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30 flex flex-col">
