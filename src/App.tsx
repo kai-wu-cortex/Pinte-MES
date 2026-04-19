@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, Suspense } from 'react';
 import { MetricCard } from './components/MetricCard';
 import { INITIAL_TASKS, MACHINES } from './data';
 import { fetchTasksFromWps, getWpsAccessToken, getCellAttachments, cachedToken } from './services/wps';
-import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Search, Loader2 } from 'lucide-react';
+import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Search, Loader2, CheckCircle, XCircle } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { cn } from './components/MetricCard';
 import { AnimatePresence, motion } from 'motion/react';
@@ -33,6 +33,23 @@ export default function App() {
   const [tokenResponse, setTokenResponse] = useState<string>('');
   const [syncResponse, setSyncResponse] = useState<string>('');
   const [autoCode, setAutoCode] = useState<string | undefined>();
+
+  // Toast notification for auto-sync events
+  const [toast, setToast] = useState<{
+    visible: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({ visible: false, message: '', type: 'success' });
+
+  // Auto-hide toast after 3 seconds
+  useEffect(() => {
+    if (toast.visible) {
+      const timer = setTimeout(() => {
+        setToast(prev => ({ ...prev, visible: false }));
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [toast.visible]);
 
   // Extract code from URL search params on mount (for OAuth callback)
   useEffect(() => {
@@ -107,6 +124,7 @@ export default function App() {
     colFrom?: number;
     colTo?: number;
   }): Promise<void> => {
+    const prevTaskCount = tasks.length;
     try {
       setIsSyncing(true);
       const token = await getWpsAccessToken(undefined, config);
@@ -122,13 +140,20 @@ export default function App() {
       setSyncResponse(JSON.stringify(rawData, null, 2));
       if (wpsTasks.length > 0) {
         setTasks(wpsTasks);
+        const changed = wpsTasks.length !== prevTaskCount;
+        const message = changed
+          ? `自动同步完成: ${wpsTasks.length} 条生产单`
+          : `自动同步完成: 数据已是最新 (${wpsTasks.length} 条)`;
+        setToast({ visible: true, message, type: 'success' });
         console.log(`Synced ${wpsTasks.length} tasks from WPS`);
       } else {
         console.warn('No tasks found in WPS spreadsheet, keeping current data');
+        setToast({ visible: true, message: '自动同步: 未找到任务数据', type: 'success' });
       }
     } catch (err) {
       console.error('WPS sync failed:', err);
       setSyncResponse(JSON.stringify({ error: String(err) }, null, 2));
+      setToast({ visible: true, message: `自动同步失败: ${String(err)}`, type: 'error' });
       throw err;
     } finally {
       setIsSyncing(false);
@@ -309,6 +334,29 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {/* Auto-sync toast notification */}
+      <AnimatePresence>
+        {toast.visible && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-16 left-1/2 -translate-x-1/2 z-[60] mt-2 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[280px] max-w-md border backdrop-blur-md"
+            style={{
+              backgroundColor: toast.type === 'success' ? 'rgba(16, 185, 129, 0.95)' : 'rgba(239, 68, 68, 0.95)',
+              borderColor: toast.type === 'success' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)',
+            }}
+          >
+            {toast.type === 'success' ? (
+              <CheckCircle className="w-5 h-5 text-white" />
+            ) : (
+              <XCircle className="w-5 h-5 text-white" />
+            )}
+            <span className="text-sm font-medium text-white">{toast.message}</span>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       <main className="flex-1 p-6 flex flex-col gap-6 overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
