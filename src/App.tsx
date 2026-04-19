@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
 import { MetricCard } from './components/MetricCard';
 import { INITIAL_TASKS, MACHINES } from './data';
 import { fetchTasksFromWps, getWpsAccessToken, getCellAttachments, cachedToken } from './services/wps';
@@ -113,7 +113,7 @@ export default function App() {
   };
 
   // Common sync logic from WPS
-  const syncTasksFromWps = async (config?: {
+  const syncTasksFromWps = useCallback(async (config?: {
     appId: string;
     appKey: string;
     apiUrl: string;
@@ -158,7 +158,7 @@ export default function App() {
     } finally {
       setIsSyncing(false);
     }
-  };
+  }, [tasks, setTasks, setSyncResponse, setIsSyncing, setToast]);
 
   const handleSyncWPS = async (config: any): Promise<void> => {
     setSyncResponse('');
