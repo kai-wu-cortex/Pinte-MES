@@ -14,14 +14,15 @@ export function ExcelPreviewModal({ task, mainFileId, onClose }: ExcelPreviewMod
   }
 
   // Build WPS web direct open URL
-  // For cell attachment: open via main file with cell reference
-  // For direct file: open directly
+  // Format: https://www.kdocs.cn/l/[fileId]
   const getOpenUrl = (): string => {
     if (task.fileUrl && task.fileUrl.startsWith('http')) {
       return task.fileUrl;
     }
-    const fileId = task.fileUrl || task.id;
-    return `https://open.wps.cn/docs/file/${fileId}`;
+    // If task has a fileUrl (attachment fileId), use it
+    // Otherwise open the main spreadsheet file
+    const fileId = task.fileUrl || mainFileId;
+    return `https://www.kdocs.cn/l/${fileId}`;
   };
 
   const openUrl = getOpenUrl();
