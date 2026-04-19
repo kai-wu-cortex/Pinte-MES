@@ -253,10 +253,10 @@ export default function App() {
     autoSync();
   }, []);
 
-  // Periodic auto-sync: check for remote changes every 30 seconds (30000 ms)
+  // Periodic auto-sync: check for remote changes every 1 minute (60000 ms)
   // handleSyncTasksFromWps is stable (useCallback with empty deps) so this only runs once
   useEffect(() => {
-    const AUTO_SYNC_INTERVAL = 30000; // 30 seconds
+    const AUTO_SYNC_INTERVAL = 60000; // 1 minute
     const timer = setInterval(async () => {
       if (import.meta.env.VITE_WPS_APP_ID && import.meta.env.VITE_WPS_SPREADSHEET_ID) {
         const savedConfig = getSavedWpsConfig();

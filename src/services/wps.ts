@@ -353,15 +353,15 @@ function convertWpsRowToTask(row: string[], index: number): Task {
   const endTime = '';
   const operator = '';
 
-  // Safe date parsing - handle invalid dates gracefully
+  // Safe date parsing - if date is empty, return empty string
   const parseDate = (dateStr: string): string => {
     const trimmed = (dateStr || '').trim();
     if (!trimmed) {
-      return new Date().toISOString();
+      return '';
     }
     const date = new Date(trimmed);
     if (isNaN(date.getTime())) {
-      return new Date().toISOString();
+      return trimmed;
     }
     return date.toISOString();
   };
