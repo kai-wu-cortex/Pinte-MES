@@ -75,12 +75,25 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
+  // Safe date parsing for filtering
+  const getSafeDate = (dateStr: string): Date => {
+    try {
+      const d = new Date(dateStr);
+      if (isNaN(d.getTime())) {
+        return new Date();
+      }
+      return d;
+    } catch {
+      return new Date();
+    }
+  };
+
   const metrics = useMemo(() => {
     const totalOrders = tasks.length;
-    const todayTasks = tasks.filter(t => isSameDay(new Date(t.startTime), new Date()));
+    const todayTasks = tasks.filter(t => isSameDay(getSafeDate(t.startTime), new Date()));
     const todayCount = todayTasks.length;
     const todayVolume = todayTasks.reduce((sum, t) => sum + (t.plannedQuantity || 0), 0);
-    
+
     return { totalOrders, todayCount, todayVolume };
   }, [tasks]);
 
@@ -98,7 +111,7 @@ export default function App() {
       );
     }
     if (filterToday) {
-      filtered = filtered.filter(t => isSameDay(new Date(t.startTime), new Date()));
+      filtered = filtered.filter(t => isSameDay(getSafeDate(t.startTime), new Date()));
     }
     return filtered;
   }, [tasks, searchQuery, filterToday]);

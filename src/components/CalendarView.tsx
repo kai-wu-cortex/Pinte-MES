@@ -307,7 +307,14 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick }: Calenda
           {/* Days Grid */}
           <div className="flex-1 grid grid-cols-7 auto-rows-fr">
             {days.map((day, i) => {
-              const dayTasks = filteredTasks.filter(t => isSameDay(new Date(t.startTime), day));
+              // Safe date parsing
+              const dayTasks = filteredTasks.filter(t => {
+                try {
+                  return isSameDay(new Date(t.startTime), day);
+                } catch {
+                  return false;
+                }
+              });
               const isCurrentMonth = isSameMonth(day, currentDate);
               
               return (

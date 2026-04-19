@@ -134,8 +134,20 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onProcessCardClick, 
           <div className={cn("flex items-center text-slate-400 gap-1.5", size !== 'sm' && "col-span-2")}>
             <Clock className={cn("shrink-0", iconSize)} />
             <span className="break-words">
-              {format(new Date(task.startTime), 'MM-dd HH:mm')}
-              {task.endTime && ` - ${format(new Date(task.endTime), 'HH:mm')}`}
+              {(() => {
+                try {
+                  return format(new Date(task.startTime), 'MM-dd HH:mm');
+                } catch {
+                  return '';
+                }
+              })()}
+              {task.endTime && ` - ${(() => {
+                try {
+                  return format(new Date(task.endTime), 'HH:mm');
+                } catch {
+                  return '';
+                }
+              })()}`}
             </span>
           </div>
         )}
