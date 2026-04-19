@@ -506,7 +506,12 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
                                 if (col.id === 'id') { e.stopPropagation(); onProcessCardClick(task); }
                               }}
                             >
-                              {col.id === 'notes' ? task.notes : task[col.id as keyof Task]}
+                              {col.id === 'startTime'
+                                ? format(new Date(task.startTime), 'yyyy-MM-dd')
+                                : col.id === 'notes'
+                                  ? task.notes
+                                  : task[col.id as keyof Task]
+                              }
                             </td>
                           ))}
                         </tr>
