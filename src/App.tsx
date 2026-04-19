@@ -344,7 +344,7 @@ export default function App() {
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="fixed top-16 left-1/2 -translate-x-1/2 z-[60] mt-2 px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[280px] max-w-md border backdrop-blur-md"
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[280px] max-w-md border backdrop-blur-md"
             style={{
               backgroundColor: toast.type === 'success' ? 'rgba(16, 185, 129, 0.95)' : 'rgba(239, 68, 68, 0.95)',
               borderColor: toast.type === 'success' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)',
