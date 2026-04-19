@@ -309,11 +309,12 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
 
     // Re-group the paginated items
     const result: Record<string, Task[]> = {};
+    // Initialize all groups that have content in this page
     includedItems.forEach(item => {
+      if (!result[item.groupName]) {
+        result[item.groupName] = [];
+      }
       if (!item.isGroupHeader) {
-        if (!result[item.groupName]) {
-          result[item.groupName] = [];
-        }
         result[item.groupName].push(item.task);
       }
     });
