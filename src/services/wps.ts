@@ -168,6 +168,12 @@ export async function getWpsAccessToken(
 
   if (!response.ok) {
     const error = await response.json() as { code: number; msg: string };
+    // If refresh token is invalid (invalid_grant), clear the cached token
+    // User needs to re-authorize
+    if (cachedToken?.refresh_token && error.msg?.includes('invalid_grant')) {
+      clearCachedToken();
+      cachedToken = null;
+    }
     throw new Error(`Failed to get WPS access token: ${error.msg || response.statusText}`);
   }
 
