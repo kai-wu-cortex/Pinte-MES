@@ -57,7 +57,6 @@ const CALENDAR_FIELDS = [
   { id: 'id', label: '流程卡号' },
   { id: 'productName', label: '品名颜色' },
   { id: 'machineName', label: '机台' },
-  { id: 'operator', label: '操作员' },
   { id: 'plannedQuantity', label: '预计数量' },
   { id: 'notes', label: '工艺备注' },
 ];
@@ -349,7 +348,6 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick }: Calenda
                         )}
                         {visibleFields.has('productName') && <div className="truncate">{task.productName}</div>}
                         {visibleFields.has('machineName') && <div className="truncate text-slate-500">{task.machineName}</div>}
-                        {visibleFields.has('operator') && <div className="truncate text-slate-500">{task.operator}</div>}
                         {visibleFields.has('plannedQuantity') && <div className="truncate text-slate-500">{task.plannedQuantity}m</div>}
                         {visibleFields.has('notes') && <div className="text-slate-500 whitespace-normal break-words">{task.notes}</div>}
                       </div>

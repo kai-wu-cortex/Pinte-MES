@@ -73,7 +73,6 @@ const COLUMNS = [
   { id: 'actualOutput', label: '实际产出', defaultWidth: 120, groupable: false },
   { id: 'slittingQuantity', label: '分切数量', defaultWidth: 120, groupable: false },
   {id: 'shippedQuantity', label: '实际出货数量', defaultWidth: 120, groupable: false },
-  { id: 'operator', label: '操作员', defaultWidth: 100, groupable: true },
   { id: 'notes', label: '工艺备注', defaultWidth: 200, groupable: true },
 ];
 
@@ -155,11 +154,20 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
   
   const [colWidths, setColWidths] = useState<Record<string, number>>(() => {
     const saved = localStorage.getItem('mes_table_col_widths');
-    if (saved) {
-      try { return JSON.parse(saved); } catch (e) {}
-    }
     const initial: Record<string, number> = {};
     COLUMNS.forEach(c => initial[c.id] = c.defaultWidth);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        // Merge saved widths with defaults - add any new columns that don't have saved widths
+        Object.keys(initial).forEach(colId => {
+          if (parsed[colId] !== undefined) {
+            initial[colId] = parsed[colId];
+          }
+        });
+        return initial;
+      } catch (e) {}
+    }
     return initial;
   });
 

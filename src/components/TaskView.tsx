@@ -63,7 +63,6 @@ const TASK_FIELDS = [
   { id: 'actualOutput', label: '实际产出', icon: Activity },
   { id: 'slittingQuantity', label: '分切数量', icon: Activity },
   { id: 'shippedQuantity', label: '实际出货数量', icon: Activity },
-  { id: 'operator', label: '操作员', icon: User },
   { id: 'notes', label: '工艺备注', icon: FileText },
 ];
 
