@@ -214,9 +214,9 @@ export default function App() {
     autoSync();
   }, []);
 
-  // Periodic auto-sync: check for remote changes every 5 minutes (300000 ms)
+  // Periodic auto-sync: check for remote changes every 30 seconds (30000 ms)
   useEffect(() => {
-    const AUTO_SYNC_INTERVAL = 300000; // 5 minutes
+    const AUTO_SYNC_INTERVAL = 30000; // 30 seconds
     const timer = setInterval(async () => {
       if (import.meta.env.VITE_WPS_APP_ID && import.meta.env.VITE_WPS_SPREADSHEET_ID) {
         try {
