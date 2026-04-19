@@ -1,6 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
-
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
     const { endpoint, body, headers } = await request.json();
 
@@ -36,14 +34,22 @@ export async function POST(request: NextRequest) {
     const response = await fetch(url, fetchOptions);
     const data = await response.json();
 
-    return NextResponse.json(data, {
+    return new Response(JSON.stringify(data), {
       status: response.ok ? 200 : response.status,
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
   } catch (error) {
     console.error('WPS proxy error:', error);
-    return NextResponse.json(
-      { error: 'Internal server error', message: String(error) },
-      { status: 500 }
+    return new Response(
+      JSON.stringify({ error: 'Internal server error', message: String(error) }),
+      {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
     );
   }
 }
