@@ -129,11 +129,14 @@ export default function App() {
     colFrom?: number;
     colTo?: number;
   }): Promise<void> => {
+    const startTime = Date.now();
     const { tasks, setTasks, setSyncResponse, setIsSyncing, setToast } = syncRef.current;
     const prevTaskCount = tasks.length;
+    console.log(`[WPS Sync] Starting sync... (prev: ${prevTaskCount} tasks)`);
     try {
       setIsSyncing(true);
       const { tasks: wpsTasks, rawData } = await syncTasksFromWps(config);
+      const elapsed = Date.now() - startTime;
       setSyncResponse(JSON.stringify(rawData, null, 2));
       if (wpsTasks.length > 0) {
         setTasks(wpsTasks);
@@ -142,13 +145,14 @@ export default function App() {
           ? `自动同步完成: ${wpsTasks.length} 条生产单`
           : `自动同步完成: 数据已是最新 (${wpsTasks.length} 条)`;
         setToast({ visible: true, message, type: 'success' });
-        console.log(`Synced ${wpsTasks.length} tasks from WPS`);
+        console.log(`[WPS Sync] ✓ Completed in ${elapsed}ms - Synced ${wpsTasks.length} tasks from WPS`);
       } else {
-        console.warn('No tasks found in WPS spreadsheet, keeping current data');
+        console.warn(`[WPS Sync] Completed in ${elapsed}ms - No tasks found in WPS spreadsheet, keeping current data`);
         setToast({ visible: true, message: '自动同步: 未找到任务数据', type: 'success' });
       }
     } catch (err) {
-      console.error('WPS sync failed:', err);
+      const elapsed = Date.now() - startTime;
+      console.error(`[WPS Sync] ✗ Failed after ${elapsed}ms:`, err);
       setSyncResponse(JSON.stringify({ error: String(err) }, null, 2));
       setToast({ visible: true, message: `自动同步失败: ${String(err)}`, type: 'error' });
       throw err;
