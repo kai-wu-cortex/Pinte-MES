@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useCallback, Suspense } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense } from 'react';
 import { MetricCard } from './components/MetricCard';
 import { INITIAL_TASKS, MACHINES } from './data';
 import { fetchTasksFromWps, getWpsAccessToken, getCellAttachments, cachedToken, syncTasksFromWps } from './services/wps';
@@ -112,7 +112,12 @@ export default function App() {
     setPreviewTask(task);
   };
 
+  // Use ref to keep latest references without changing function identity
+  const syncRef = useRef({ tasks, setTasks, setSyncResponse, setIsSyncing, setToast });
+  syncRef.current = { tasks, setTasks, setSyncResponse, setIsSyncing, setToast };
+
   // Common sync logic from WPS (delegates to wps service)
+  // useCallback with empty deps keeps function identity stable forever
   const handleSyncTasksFromWps = useCallback(async (config?: {
     appId: string;
     appKey: string;
@@ -124,6 +129,7 @@ export default function App() {
     colFrom?: number;
     colTo?: number;
   }): Promise<void> => {
+    const { tasks, setTasks, setSyncResponse, setIsSyncing, setToast } = syncRef.current;
     const prevTaskCount = tasks.length;
     try {
       setIsSyncing(true);
@@ -149,7 +155,7 @@ export default function App() {
     } finally {
       setIsSyncing(false);
     }
-  }, [tasks, setTasks, setSyncResponse, setIsSyncing, setToast]);
+  }, []);
 
   const handleSyncWPS = async (config: any): Promise<void> => {
     setSyncResponse('');
@@ -231,6 +237,7 @@ export default function App() {
   }, []);
 
   // Periodic auto-sync: check for remote changes every 30 seconds (30000 ms)
+  // handleSyncTasksFromWps is stable (useCallback with empty deps) so this only runs once
   useEffect(() => {
     const AUTO_SYNC_INTERVAL = 30000; // 30 seconds
     const timer = setInterval(async () => {
@@ -245,7 +252,7 @@ export default function App() {
       }
     }, AUTO_SYNC_INTERVAL);
     return () => clearInterval(timer);
-  }, [handleSyncTasksFromWps]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30 flex flex-col">
