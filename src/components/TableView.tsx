@@ -63,6 +63,7 @@ const spacingStyles = {
 };
 
 const COLUMNS = [
+  { id: 'startTime', label: '日期', defaultWidth: 120, groupable: true },
   { id: 'id', label: '流程卡号', defaultWidth: 120, groupable: false },
   { id: 'process', label: '工艺', defaultWidth: 100, groupable: true },
   { id: 'machineName', label: '机台', defaultWidth: 120, groupable: true },

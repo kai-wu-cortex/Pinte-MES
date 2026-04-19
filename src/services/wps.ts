@@ -310,24 +310,26 @@ export async function fetchTasksFromWps(
 /**
  * Convert WPS spreadsheet row to application Task type
  * Expected columns (adjust based on actual spreadsheet):
- * 0: process (工艺)
- * 1: machineName (机台)
- * 2: id (流程卡号)
- * 3: fileUrl (电子流程卡 - WPS文件ID)
- * 4: productName (品名颜色)
- * 5: specification (规格)
- * 6: plannedQuantity (预计数量/m)
- * 7: actualOutput (实际产出)
- * 8: slittingQuantity (分切数量)
- * 9: shippedQuantity (实际出货数量)
- * 10: notes (备注)
+ * 0: date (日期) - used for startTime
+ * 1: process (工艺)
+ * 2: machineName (机台)
+ * 3: id (流程卡号)
+ * 4: fileUrl (电子流程卡 - WPS文件ID)
+ * 5: productName (品名颜色)
+ * 6: specification (规格)
+ * 7: plannedQuantity (预计数量/m)
+ * 8: actualOutput (实际产出)
+ * 9: slittingQuantity (分切数量)
+ * 10: shippedQuantity (实际出货数量)
+ * 11: notes (备注)
  *
  * Missing columns get default values:
- * startTime/endTime: current date
+ * endTime: empty (defaults to current date if needed)
  * operator: empty string
  */
 function convertWpsRowToTask(row: string[], index: number): Task {
   const [
+    date = '',
     process = '',
     machineName = '',
     id = '',
@@ -348,7 +350,6 @@ function convertWpsRowToTask(row: string[], index: number): Task {
   const resolvedMachineName = machine?.name || trimmedMachineName;
 
   // Defaults for missing columns
-  const startTime = '';
   const endTime = '';
   const operator = '';
 
@@ -367,8 +368,8 @@ function convertWpsRowToTask(row: string[], index: number): Task {
 
   // The actual row index in WPS spreadsheet: original data starts at row 2 (0-based) after header
   const wpsRowIndex = index + 2;
-  // fileUrl is in column 3 (0-based)
-  const wpsColIndex = 3;
+  // fileUrl is in column 4 (0-based)
+  const wpsColIndex = 4;
 
   return {
     id: (id || '').trim(),
@@ -381,7 +382,7 @@ function convertWpsRowToTask(row: string[], index: number): Task {
     actualOutput: Number(actualOutput) || 0,
     slittingQuantity: Number(slittingQuantity) || 0,
     shippedQuantity: Number(shippedQuantity) || 0,
-    startTime: parseDate(startTime),
+    startTime: parseDate(date),
     endTime: parseDate(endTime),
     operator: (operator || '').trim(),
     notes: (notes || '').trim(),
