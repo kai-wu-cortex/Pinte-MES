@@ -327,6 +327,29 @@ export default function App() {
             </div>
           )}
 
+          <AnimatePresence>
+            {toast.visible && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{ duration: 0.2 }}
+                className={`text-sm px-3 py-1.5 rounded-lg border flex items-center gap-2 ${
+                  toast.type === 'success'
+                    ? 'text-green-100 bg-green-900/80 border-green-700/50'
+                    : 'text-red-100 bg-red-900/80 border-red-700/50'
+                }`}
+              >
+                {toast.type === 'success' ? (
+                  <CheckCircle className="w-4 h-4" />
+                ) : (
+                  <XCircle className="w-4 h-4" />
+                )}
+                {toast.message}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           <button
             onClick={() => setShowSettings(true)}
             className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700"
@@ -336,29 +359,6 @@ export default function App() {
           </button>
         </div>
       </header>
-
-      {/* Auto-sync toast notification */}
-      <AnimatePresence>
-        {toast.visible && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-3 rounded-lg shadow-lg flex items-center gap-3 min-w-[280px] max-w-md border backdrop-blur-md"
-            style={{
-              backgroundColor: toast.type === 'success' ? 'rgba(16, 185, 129, 0.95)' : 'rgba(239, 68, 68, 0.95)',
-              borderColor: toast.type === 'success' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)',
-            }}
-          >
-            {toast.type === 'success' ? (
-              <CheckCircle className="w-5 h-5 text-white" />
-            ) : (
-              <XCircle className="w-5 h-5 text-white" />
-            )}
-            <span className="text-sm font-medium text-white">{toast.message}</span>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <main className="flex-1 p-6 flex flex-col gap-6 overflow-hidden">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
