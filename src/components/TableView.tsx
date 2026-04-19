@@ -280,31 +280,42 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
       return { '所有任务': filteredTasks.slice(startIndex, endIndex) };
     }
 
-    // If grouped: we need to paginate across all groups - count only task rows (ignore group headers for page sizing)
-    let taskCount = 0;
+    // If grouped: paginate across all groups, count includes both group headers and task rows
+    // pageSize means total visible rows per page (group headers + tasks)
+    let totalRowsSeen = 0; // Total rows (headers + tasks) we've passed so far
+    let taskCount = 0; // Count only task rows for statistics
     const pageSizeNum = pageSize as number;
-    const startTaskIndex = (currentPage - 1) * pageSizeNum;
-    const endTaskIndex = startTaskIndex + pageSizeNum;
+    const startRow = (currentPage - 1) * pageSizeNum;
+    const endRow = startRow + pageSizeNum;
     const includedItems: { groupName: string; task: Task; isGroupHeader: boolean }[] = [];
 
     (Object.entries(groupedTasks) as [string, Task[]][]).forEach(([groupName, groupTasks]) => {
-      // Include group header if this group still has tasks in current page range
-      const groupStartIndex = taskCount;
-      const groupEndIndex = taskCount + groupTasks.length;
+      // If we've already filled the page, stop adding
+      if (totalRowsSeen >= endRow) return;
 
-      if (groupEndIndex > startTaskIndex && groupStartIndex < endTaskIndex) {
-        // This group has at least one task in current page - add the group header
-        includedItems.push({ groupName, task: null as any, isGroupHeader: true });
-        groupTasks.forEach(task => {
-          if (taskCount >= startTaskIndex && taskCount < endTaskIndex) {
-            includedItems.push({ groupName, task, isGroupHeader: false });
+      let groupStarted = false;
+
+      groupTasks.forEach(task => {
+        // If we've already filled the page, stop adding
+        if (totalRowsSeen >= endRow) return;
+
+        // Before adding the first task of this group that's included in this page, we need to add the group header
+        if (!groupStarted) {
+          // Only add the group header if at least one task from this group is going to be visible on current page
+          if (totalRowsSeen >= startRow) {
+            includedItems.push({ groupName, task: null as any, isGroupHeader: true });
+            totalRowsSeen++;
           }
-          taskCount++;
-        });
-      } else {
-        // No tasks from this group in current page - skip entirely
-        taskCount += groupTasks.length;
-      }
+          groupStarted = true;
+        }
+
+        // Now add the task if we're past the start row
+        if (totalRowsSeen >= startRow && totalRowsSeen < endRow) {
+          includedItems.push({ groupName, task, isGroupHeader: false });
+          totalRowsSeen++;
+        }
+        taskCount++;
+      });
     });
 
     // Re-group the paginated items
@@ -326,7 +337,17 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
     return (Object.values(groupedTasks) as Task[][]).reduce((sum, tasks) => sum + tasks.length, 0);
   }, [groupedTasks]);
 
-  const totalPages = pageSize === 'all' ? 1 : Math.ceil(totalFilteredRows / pageSize);
+  // Calculate total visible rows including group headers for pagination
+  // Each group adds 1 header row + N task rows
+  const totalVisibleRows = useMemo(() => {
+    if (groupBy === 'none') {
+      return totalFilteredRows;
+    }
+    const groupCount = Object.keys(groupedTasks).length;
+    return groupCount + totalFilteredRows;
+  }, [groupedTasks, totalFilteredRows, groupBy]);
+
+  const totalPages = pageSize === 'all' ? 1 : Math.ceil(totalVisibleRows / pageSize);
 
   return (
     <div className="w-full h-full flex flex-col rounded-xl border border-blue-900/50 bg-slate-900/50 backdrop-blur-sm overflow-hidden">
@@ -493,7 +514,7 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
           <div className="text-xs text-slate-400">
             {pageSize === 'all'
               ? `显示全部 共 ${totalFilteredRows} 条`
-              : `显示 ${(currentPage - 1) * (pageSize as number) + 1} - ${Math.min(currentPage * (pageSize as number), totalFilteredRows)} 共 ${totalFilteredRows} 条`
+              : `显示 ${(currentPage - 1) * (pageSize as number) + 1} - ${Math.min(currentPage * (pageSize as number), totalVisibleRows)} 共 ${totalFilteredRows} 条`
             }
           </div>
           <div className="flex items-center gap-2">
