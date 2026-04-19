@@ -100,13 +100,15 @@ export function TaskDetailModal({ task, onClose }: TaskDetailModalProps) {
                 </label>
                 <div className="bg-slate-800/50 border border-slate-700/50 rounded-lg p-3 space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-400">开始时间</span>
+                    <span className="text-xs text-slate-400">日期</span>
                     <span className="text-sm text-slate-200">{format(new Date(task.startTime), 'yyyy-MM-dd HH:mm')}</span>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-slate-400">结束时间</span>
-                    <span className="text-sm text-slate-200">{format(new Date(task.endTime), 'yyyy-MM-dd HH:mm')}</span>
-                  </div>
+                  {task.endTime && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-slate-400">结束时间</span>
+                      <span className="text-sm text-slate-200">{format(new Date(task.endTime), 'yyyy-MM-dd HH:mm')}</span>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
