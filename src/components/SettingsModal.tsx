@@ -32,8 +32,6 @@ const loadSavedConfig = () => {
         colFrom: 0,
         colTo: 10,
         code: '',
-        webOfficeAppId: '',
-        webOfficeAppSecret: '',
         ...parsed,
       };
     } catch {
@@ -48,8 +46,6 @@ const loadSavedConfig = () => {
         colFrom: 0,
         colTo: 10,
         code: '',
-        webOfficeAppId: '',
-        webOfficeAppSecret: '',
       };
     }
   }
@@ -64,8 +60,6 @@ const loadSavedConfig = () => {
     colFrom: 0,
     colTo: 10,
     code: '',
-    webOfficeAppId: '',
-    webOfficeAppSecret: '',
   };
 };
 
@@ -269,37 +263,6 @@ export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tok
                 placeholder="10"
               />
             </div>
-          </div>
-
-          <div className="pt-4 border-t border-blue-900/30">
-            <h3 className="text-sm font-semibold text-slate-300 mb-4">WebOffice 嵌入预览配置</h3>
-            <p className="text-xs text-slate-500 mb-4">WebOffice 使用独立的 App ID/Secret 与 WPS API 分开配置</p>
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1.5">
-              <Key className="w-3.5 h-3.5" /> WebOffice App ID
-            </label>
-            <input
-              type="text"
-              value={config.webOfficeAppId}
-              onChange={e => saveConfig({...config, webOfficeAppId: e.target.value})}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-              placeholder="输入 WPS WebOffice App ID"
-            />
-          </div>
-
-          <div>
-            <label className="text-xs font-medium text-slate-400 flex items-center gap-1.5 mb-1.5">
-              <Key className="w-3.5 h-3.5" /> WebOffice App Secret
-            </label>
-            <input
-              type="password"
-              value={config.webOfficeAppSecret}
-              onChange={e => saveConfig({...config, webOfficeAppSecret: e.target.value})}
-              className="w-full bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-sm text-slate-200 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 transition-all"
-              placeholder="输入 WPS WebOffice App Secret"
-            />
           </div>
 
           <div>
