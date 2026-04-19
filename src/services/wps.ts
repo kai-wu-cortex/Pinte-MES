@@ -354,16 +354,15 @@ function convertWpsRowToTask(row: string[], index: number): Task {
   const operator = '';
 
   // Safe date parsing - always return a valid ISO string that can be passed to new Date()
-  // If parsing fails, fallback to current date
+  // If empty or parsing fails, fallback to current date
   const parseDate = (dateStr: string): string => {
     const trimmed = (dateStr || '').trim();
     if (!trimmed) {
-      return '';
+      return new Date().toISOString();
     }
     const date = new Date(trimmed);
     if (isNaN(date.getTime())) {
-      // If date string cannot be parsed, return current date
-      // The original string will be displayed in the table if needed
+      // If date string cannot be parsed, fallback to current date
       return new Date().toISOString();
     }
     return date.toISOString();
