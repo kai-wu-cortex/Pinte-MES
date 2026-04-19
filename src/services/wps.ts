@@ -114,6 +114,7 @@ export async function getWpsAccessToken(
       },
       body: JSON.stringify({
         endpoint: '/oauth2/token',
+        method: 'POST',
         body: Object.fromEntries(body),
       }),
     });
@@ -194,6 +195,7 @@ export async function fetchTasksFromWps(
       },
       body: JSON.stringify({
         endpoint,
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },
@@ -394,6 +396,7 @@ export async function getCellAttachments(
       },
       body: JSON.stringify({
         endpoint,
+        method: 'GET',
         headers: {
           Authorization: `Bearer ${accessToken}`,
         },

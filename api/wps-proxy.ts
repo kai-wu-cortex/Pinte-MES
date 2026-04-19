@@ -1,19 +1,18 @@
 export async function POST(request: Request) {
   try {
-    const { endpoint, body, headers } = await request.json();
+    const { endpoint, body, headers, method = 'GET' } = await request.json();
 
     const wpsApiBase = 'https://openapi.wps.cn';
     const url = `${wpsApiBase}${endpoint}`;
 
     let fetchOptions: RequestInit = {
-      method: 'POST',
+      method,
       headers: {
-        'Content-Type': 'application/json',
         ...headers,
       },
     };
 
-    if (body) {
+    if (body && method === 'POST') {
       if (typeof body === 'object' && !(body instanceof FormData)) {
         // For OAuth token request, body is already URLSearchParams as object from frontend
         if (endpoint === '/oauth2/token') {
@@ -25,7 +24,13 @@ export async function POST(request: Request) {
           };
         } else {
           fetchOptions.body = JSON.stringify(body);
+          fetchOptions.headers = {
+            'Content-Type': 'application/json',
+            ...headers,
+          };
         }
+      } else if (body instanceof FormData) {
+        fetchOptions.body = body;
       } else {
         fetchOptions.body = JSON.stringify(body);
       }
