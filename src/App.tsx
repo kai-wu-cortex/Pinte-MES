@@ -229,7 +229,7 @@ export default function App() {
       }
     }, AUTO_SYNC_INTERVAL);
     return () => clearInterval(timer);
-  }, []);
+  }, [syncTasksFromWps]);
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30 flex flex-col">
