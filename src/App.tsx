@@ -21,7 +21,7 @@ type ViewMode = 'table' | 'calendar' | 'task';
 
 export default function App() {
   const [viewMode, setViewMode] = useLocalStorage<ViewMode>('mes_viewMode', 'calendar');
-  const [tasks, setTasks] = useState<Task[]>(INITIAL_TASKS);
+  const [tasks, setTasks] = useLocalStorage<Task[]>('mes_tasks', INITIAL_TASKS);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [previewTask, setPreviewTask] = useState<Task | null>(null);
   const [showSettings, setShowSettings] = useState(false);
@@ -48,12 +48,12 @@ export default function App() {
     }
   }, []);
 
-  const [currentTime, setCurrentTime] = useState(format(new Date(), 'yyyy-MM-dd HH:mm:ss'));
+  const [currentTime, setCurrentTime] = useState(format(new Date(), 'yyyy-MM-dd HH:mm'));
 
   // Auto-update clock every minute
   useEffect(() => {
     const timer = setInterval(() => {
-      setCurrentTime(format(new Date(), 'yyyy-MM-dd HH:mm:ss'));
+      setCurrentTime(format(new Date(), 'yyyy-MM-dd HH:mm'));
     }, 60000);
     return () => clearInterval(timer);
   }, []);
@@ -206,12 +206,29 @@ export default function App() {
           await syncTasksFromWps();
           console.log('Auto-sync completed on startup');
         } catch (err) {
-          console.error('Auto WPS sync failed, using initial data:', err);
+          console.error('Auto WPS sync failed, using initial/cached data:', err);
         }
       }
     };
 
     autoSync();
+  }, []);
+
+  // Periodic auto-sync: check for remote changes every 5 minutes (300000 ms)
+  useEffect(() => {
+    const AUTO_SYNC_INTERVAL = 300000; // 5 minutes
+    const timer = setInterval(async () => {
+      if (import.meta.env.VITE_WPS_APP_ID && import.meta.env.VITE_WPS_SPREADSHEET_ID) {
+        try {
+          await syncTasksFromWps();
+          console.log('Periodic auto-sync completed');
+        } catch (err) {
+          console.error('Periodic WPS sync failed:', err);
+          // Don't clear existing data on error
+        }
+      }
+    }, AUTO_SYNC_INTERVAL);
+    return () => clearInterval(timer);
   }, []);
 
   return (
