@@ -223,13 +223,26 @@ export default function App() {
     }
   };
 
+  // Load saved config from localStorage for auto sync
+  const getSavedWpsConfig = () => {
+    try {
+      const saved = localStorage.getItem('wps_config');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        return parsed;
+      }
+    } catch {}
+    return undefined;
+  };
+
   // Auto sync on app start
   useEffect(() => {
     const autoSync = async () => {
       // Only auto-sync if WPS is configured
       if (import.meta.env.VITE_WPS_APP_ID && import.meta.env.VITE_WPS_SPREADSHEET_ID) {
+        const savedConfig = getSavedWpsConfig();
         try {
-          await handleSyncTasksFromWps();
+          await handleSyncTasksFromWps(savedConfig);
           console.log('Auto-sync completed on startup');
         } catch (err) {
           console.error('Auto WPS sync failed, using initial/cached data:', err);
@@ -246,8 +259,9 @@ export default function App() {
     const AUTO_SYNC_INTERVAL = 30000; // 30 seconds
     const timer = setInterval(async () => {
       if (import.meta.env.VITE_WPS_APP_ID && import.meta.env.VITE_WPS_SPREADSHEET_ID) {
+        const savedConfig = getSavedWpsConfig();
         try {
-          await handleSyncTasksFromWps();
+          await handleSyncTasksFromWps(savedConfig);
           console.log('Periodic auto-sync completed');
         } catch (err) {
           console.error('Periodic WPS sync failed:', err);
