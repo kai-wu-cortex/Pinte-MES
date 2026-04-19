@@ -48,7 +48,15 @@ export default function App() {
     }
   }, []);
 
-  const currentTime = format(new Date(), 'yyyy-MM-dd HH:mm:ss');
+  const [currentTime, setCurrentTime] = useState(format(new Date(), 'yyyy-MM-dd HH:mm:ss'));
+
+  // Auto-update clock every minute
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(format(new Date(), 'yyyy-MM-dd HH:mm:ss'));
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   const metrics = useMemo(() => {
     const totalOrders = tasks.length;

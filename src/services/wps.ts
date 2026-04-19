@@ -18,12 +18,49 @@ export interface WpsAccessTokenResponse {
   refresh_expires_in: string;
 }
 
-// Cached access token with expiration
+// Cached access token with expiration - loaded from localStorage on initialization
+const CACHE_KEY = 'wps_cached_token';
 export let cachedToken: {
   access_token: string;
   refresh_token: string;
   expiresAt: number;
-} | null = null;
+} | null = (() => {
+  // Load from localStorage on module load
+  try {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem(CACHE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Check if refresh token is still valid
+        if (parsed.expiresAt && parsed.refresh_token) {
+          // Even if access token expired, we can still use refresh token
+          return parsed;
+        }
+      }
+    }
+  } catch {}
+  return null;
+})();
+
+function saveCachedToken(token: {
+  access_token: string;
+  refresh_token: string;
+  expiresAt: number;
+}): void {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(token));
+    } catch {}
+  }
+}
+
+function clearCachedToken(): void {
+  if (typeof window !== 'undefined') {
+    try {
+      localStorage.removeItem(CACHE_KEY);
+    } catch {}
+  }
+}
 
 export interface WpsCellValue {
   sheetIndex: number;
@@ -146,6 +183,7 @@ export async function getWpsAccessToken(
     refresh_token: data.refresh_token,
     expiresAt: Date.now() + (data.expires_in * 1000),
   };
+  saveCachedToken(cachedToken);
 
   return data;
 }
