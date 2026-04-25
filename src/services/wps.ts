@@ -1,5 +1,35 @@
-import { Task } from '../types';
-import { MACHINES } from '../data';
+import { Task, CustomFieldConfig } from '../types';
+import { DEFAULT_FIELD_CONFIG, MACHINES } from '../data';
+
+/**
+ * Extract header names from raw WPS response
+ * Headers are assumed to be in row 2 (0-based index = 2 after title row at 1)
+ */
+export function extractHeadersFromRawResponse(rawData: any): string[] {
+  if (!rawData?.data?.range_data || !Array.isArray(rawData.data.range_data)) {
+    return [];
+  }
+
+  // Group by row_from to get the entire header row
+  const rowsMap: { [rowFrom: number]: string[] } = {};
+  rawData.data.range_data.forEach((cell: any) => {
+    const rowKey = cell.row_from;
+    if (!rowsMap[rowKey]) {
+      rowsMap[rowKey] = [];
+    }
+    rowsMap[rowKey][cell.col_from] = (cell.cell_text || '').trim();
+  });
+
+  // Get sorted row keys
+  const sortedRows = Object.keys(rowsMap).map(Number).sort((a, b) => a - b);
+
+  // Header is the second data row (index 1 in sorted rows = actual row 2 in sheet)
+  // If there's only one row, use that
+  const headerRow = sortedRows.length >= 2 ? rowsMap[sortedRows[1]] : rowsMap[sortedRows[0]];
+
+  // Filter out empty headers
+  return headerRow.filter(h => h && h.trim()).map(h => h.trim());
+}
 
 const WPS_CONFIG = {
   appId: import.meta.env.VITE_WPS_APP_ID || '',
@@ -208,8 +238,9 @@ export async function fetchTasksFromWps(
     colFrom?: number;
     colTo?: number;
     apiBase?: string;
+    fieldConfig?: CustomFieldConfig[];
   }
-): Promise<{ tasks: Task[]; rawData: WpsSpreadsheetRangeResponse }> {
+): Promise<{ tasks: Task[]; rawData: any; headers: string[] }> {
   const spreadsheetId = options?.spreadsheetId || WPS_CONFIG.spreadsheetId;
   if (!spreadsheetId) {
     throw new Error('WPS spreadsheet ID not configured');
@@ -221,6 +252,7 @@ export async function fetchTasksFromWps(
   const colFrom = options?.colFrom ?? 0;
   const colTo = options?.colTo ?? 10;
   const apiBase = options?.apiBase || WPS_CONFIG.apiBase;
+  const fieldConfig = options?.fieldConfig || DEFAULT_FIELD_CONFIG;
 
   // API path requires: /v7/sheets/{file_id}/worksheets/{worksheet_id}/range_data
   // Note: worksheet_id in URL path is snake_case (not camelCase worksheetId), sheets is plural per docs
@@ -271,13 +303,16 @@ export async function fetchTasksFromWps(
   // }
   const fullResponse = await response.json();
 
+  // Extract headers first
+  const headers = extractHeadersFromRawResponse(fullResponse);
+
   // Convert WPS response format to our expected row format
   // Group cells by row - each row has row_from (same for all cells in the same row)
   const rangeData = fullResponse?.data?.range_data || [];
 
   if (!rangeData || rangeData.length === 0) {
     // No data
-    return { tasks: [], rawData: fullResponse };
+    return { tasks: [], rawData: fullResponse, headers };
   }
 
   // Group cells by row
@@ -298,13 +333,13 @@ export async function fetchTasksFromWps(
 
   if (rows.length <= 2) {
     // No data or only title + header rows
-    return { tasks: [], rawData: fullResponse };
+    return { tasks: [], rawData: fullResponse, headers };
   }
 
   // First row = title (merged cell), second row = header, skip both, data starts from third row
   const dataRows = rows.slice(2);
-  const tasks = dataRows.map((row, index) => convertWpsRowToTask(row, index));
-  return { tasks, rawData: fullResponse };
+  const tasks = dataRows.map((row, index) => convertWpsRowToTask(row, headers, fieldConfig, index));
+  return { tasks, rawData: fullResponse, headers };
 }
 
 /**
@@ -327,71 +362,110 @@ export async function fetchTasksFromWps(
  * endTime: empty (defaults to current date if needed)
  * operator: empty string
  */
-function convertWpsRowToTask(row: string[], index: number): Task {
-  const [
-    date = '',
-    process = '',
-    machineName = '',
-    id = '',
-    fileUrl = '',
-    productName = '',
-    specification = '',
-    plannedQuantity = '0',
-    actualOutput = '0',
-    slittingQuantity = '0',
-    shippedQuantity = '0',
-    notes = '',
-  ] = row;
+/**
+ * Convert WPS spreadsheet row to application Task type using custom field mapping configuration
+ */
+function convertWpsRowToTask(
+  row: string[],
+  headerNames: string[],
+  fieldConfig: CustomFieldConfig[],
+  index: number
+): Task {
+  // Create a map from WPS column name to column index
+  const columnIndexMap: { [colName: string]: number } = {};
+  headerNames.forEach((name, idx) => {
+    columnIndexMap[name] = idx;
+  });
 
-  // Get machineId from machineName by looking up in MACHINES list
-  const trimmedMachineName = machineName.trim();
-  const machine = MACHINES.find(m => m.name === trimmedMachineName);
-  const machineId = machine?.id || `M-${Date.now() + index}`;
-  const resolvedMachineName = machine?.name || trimmedMachineName;
+  // Get value for a field based on mapping
+  const getValue = (config: CustomFieldConfig): string => {
+    const colIdx = columnIndexMap[config.mappedColumn];
+    if (colIdx === undefined || colIdx >= row.length) {
+      return '';
+    }
+    return row[colIdx] || '';
+  };
 
-  // Defaults for missing columns
-  const endTime = '';
-  const operator = '';
+  // Convert to number if field ID ends with Quantity
+  const getNumberValue = (config: CustomFieldConfig): number => {
+    const val = getValue(config);
+    return Number(val) || 0;
+  };
 
-  // Safe date parsing - always return a valid ISO string that can be passed to new Date()
-  // If empty or parsing fails, fallback to current date
-  const parseDate = (dateStr: string): string => {
-    const trimmed = (dateStr || '').trim();
+  // Convert to ISO date if field ID contains Date or Time
+  const getDateValue = (config: CustomFieldConfig): string => {
+    const val = getValue(config);
+    const trimmed = (val || '').trim();
     if (!trimmed) {
       return new Date().toISOString();
     }
     const date = new Date(trimmed);
     if (isNaN(date.getTime())) {
-      // If date string cannot be parsed, fallback to current date
       return new Date().toISOString();
     }
     return date.toISOString();
   };
 
-  // The actual row index in WPS spreadsheet: original data starts at row 2 (0-based) after header
-  const wpsRowIndex = index + 2;
-  // fileUrl is in column 4 (0-based)
-  const wpsColIndex = 4;
-
-  return {
-    id: (id || '').trim(),
-    process: (process || '').trim(),
-    machineId,
-    machineName: resolvedMachineName,
-    productName: (productName || '').trim(),
-    specification: (specification || '').trim(),
-    plannedQuantity: Number(plannedQuantity) || 0,
-    actualOutput: Number(actualOutput) || 0,
-    slittingQuantity: Number(slittingQuantity) || 0,
-    shippedQuantity: Number(shippedQuantity) || 0,
-    startTime: parseDate(date),
-    endTime: parseDate(endTime),
-    operator: (operator || '').trim(),
-    notes: (notes || '').trim(),
-    fileUrl: (fileUrl || '').trim() || undefined,
-    fileWpsRow: wpsRowIndex,
-    fileWpsCol: wpsColIndex,
+  // Start with all custom fields
+  const task: any = {
+    fileWpsRow: index + 2, // row index after header
+    fileWpsCol: 4, // default attachment column
   };
+
+  // Fill each field according to config
+  fieldConfig.forEach(config => {
+    if (config.fieldId.includes('Quantity')) {
+      task[config.fieldId] = getNumberValue(config);
+    } else if (config.fieldId.toLowerCase().includes('date') || config.fieldId.toLowerCase().includes('time')) {
+      task[config.fieldId] = getDateValue(config);
+    } else {
+      task[config.fieldId] = getValue(config).trim();
+    }
+  });
+
+  // Ensure required fields have defaults
+  if (!task.machineId) {
+    // Get machineId from machineName
+    const machineName = task.machineName || '';
+    const trimmedMachineName = machineName.trim();
+    const machine = MACHINES.find(m => m.name === trimmedMachineName);
+    task.machineId = machine?.id || `M-${Date.now() + index}`;
+  }
+
+  // Ensure required number fields have defaults
+  ['plannedQuantity', 'actualOutput', 'slittingQuantity', 'shippedQuantity'].forEach(field => {
+    if (typeof task[field] !== 'number') {
+      task[field] = 0;
+    }
+  });
+
+  // Ensure required string fields have defaults
+  ['operator'].forEach(field => {
+    if (!task[field]) {
+      task[field] = '';
+    }
+  });
+
+  // endTime defaults to empty string converted to current date
+  if (!task.endTime) {
+    task.endTime = '';
+    // Still need valid ISO for Date constructor
+    if (!task.endTime) {
+      task.endTime = new Date().toISOString();
+    }
+  }
+
+  // fileUrl is special - it's the attachment cell for electronic process card
+  // Look for field that might contain it - usually "电子流程卡"
+  const processCardField = fieldConfig.find(c =>
+    c.mappedColumn.includes('电子') || c.mappedColumn.includes('流程卡')
+  );
+  if (processCardField && task[processCardField.fieldId]) {
+    task.fileUrl = String(task[processCardField.fieldId]) || undefined;
+    task.fileWpsCol = columnIndexMap[processCardField.mappedColumn] || 4;
+  }
+
+  return task as Task;
 }
 
 /**
@@ -480,8 +554,9 @@ export async function syncTasksFromWps(
     rowTo?: number;
     colFrom?: number;
     colTo?: number;
+    fieldConfig?: CustomFieldConfig[];
   }
-): Promise<{ tasks: Task[]; rawData: any }> {
+): Promise<{ tasks: Task[]; rawData: any; headers: string[] }> {
   const token = await getWpsAccessToken(undefined, config);
   const result = await fetchTasksFromWps(token.access_token, {
     spreadsheetId: config?.fileId,
@@ -491,6 +566,7 @@ export async function syncTasksFromWps(
     colFrom: config?.colFrom,
     colTo: config?.colTo,
     apiBase: config?.apiUrl,
+    fieldConfig: config?.fieldConfig,
   });
   return result;
 }
