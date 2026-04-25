@@ -1,3 +1,11 @@
+export interface CustomFieldConfig {
+  fieldId: string;        // Unique identifier for the field
+  displayName: string;    // Display name in UI
+  mappedColumn: string;   // Which WPS column this field maps to
+  visible: boolean;       // Whether this field should be visible in views
+  isDefault: boolean;     // Whether this is a system default field (can't edit ID/name)
+}
+
 export interface Task {
   id: string; // 流程卡号
   process: string; // 工艺
@@ -16,6 +24,8 @@ export interface Task {
   fileUrl?: string; // File URL or cell text
   fileWpsRow?: number; // Row index of this attachment cell in main spreadsheet
   fileWpsCol?: number; // Column index of this attachment cell in main spreadsheet
+  // Allow additional custom fields via index signature
+  [key: string]: string | number | undefined;
 }
 
 export interface Machine {
