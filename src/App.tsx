@@ -463,6 +463,7 @@ export default function App() {
         {showSettings && (
           <Suspense fallback={null}>
             <SettingsModal
+              show={showSettings}
               onClose={() => setShowSettings(false)}
               onSync={handleSyncWPS}
               onGetToken={handleGetToken}
