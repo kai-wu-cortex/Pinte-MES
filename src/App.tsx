@@ -36,7 +36,7 @@ export default function App() {
   const [autoCode, setAutoCode] = useState<string | undefined>();
 
   // Load field configuration from localStorage
-  const [fieldConfig] = useLocalStorage<CustomFieldConfig[]>('mes_field_mapping_config', DEFAULT_FIELD_CONFIG);
+  const [fieldConfig, setFieldConfig] = useLocalStorage<CustomFieldConfig[]>('mes_field_mapping_config', DEFAULT_FIELD_CONFIG);
 
   // Toast notification for auto-sync events
   const [toast, setToast] = useState<{
@@ -481,8 +481,8 @@ export default function App() {
               tokenResponse={tokenResponse}
               syncResponse={syncResponse}
               onSaveFieldConfig={(config) => {
-                // App doesn't need to update state because SettingsModal saves directly to localStorage
-                // All views read from localStorage on mount, so no action needed here
+                // Update App state so next sync uses the new configuration
+                setFieldConfig(config);
               }}
             />
           </Suspense>
