@@ -27,8 +27,9 @@ export function extractHeadersFromRawResponse(rawData: any): string[] {
   // If there's only one row, use that
   const headerRow = sortedRows.length >= 2 ? rowsMap[sortedRows[1]] : rowsMap[sortedRows[0]];
 
-  // Filter out empty headers
-  return headerRow.filter(h => h && h.trim()).map(h => h.trim());
+  // Keep the original array length - don't filter out empty cells
+  // Just trim each cell and keep position matching with actual column indexes
+  return headerRow.map(h => (h || '').trim());
 }
 
 const WPS_CONFIG = {
