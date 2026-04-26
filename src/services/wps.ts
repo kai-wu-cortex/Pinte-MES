@@ -250,7 +250,7 @@ export async function fetchTasksFromWps(
   const rowFrom = options?.rowFrom ?? 0;
   const rowTo = options?.rowTo ?? 9999;
   const colFrom = options?.colFrom ?? 0;
-  const colTo = options?.colTo ?? 10;
+  const colTo = options?.colTo ?? 30;
   const apiBase = options?.apiBase || WPS_CONFIG.apiBase;
   const fieldConfig = options?.fieldConfig || DEFAULT_FIELD_CONFIG;
 

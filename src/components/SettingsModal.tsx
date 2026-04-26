@@ -34,7 +34,7 @@ const loadSavedConfig = () => {
         rowFrom: 0,
         rowTo: 9999,
         colFrom: 0,
-        colTo: 10,
+        colTo: 30,
         code: '',
         ...parsed,
       };
@@ -48,7 +48,7 @@ const loadSavedConfig = () => {
         rowFrom: 0,
         rowTo: 9999,
         colFrom: 0,
-        colTo: 10,
+        colTo: 30,
         code: '',
       };
     }
@@ -62,7 +62,7 @@ const loadSavedConfig = () => {
     rowFrom: 0,
     rowTo: 9999,
     colFrom: 0,
-    colTo: 10,
+    colTo: 30,
     code: '',
   };
 };
