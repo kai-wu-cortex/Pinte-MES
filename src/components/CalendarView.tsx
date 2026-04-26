@@ -75,7 +75,11 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick }: Calenda
     return new Set(fieldConfig.filter(f => f.visible).map(f => f.fieldId));
   }, [fieldConfig]);
 
-  const [visibleFieldsArr, setVisibleFieldsArr] = useLocalStorage<string[]>('mes_calendar_visibleFields', ['id', 'productName', 'machineName']);
+  const [visibleFieldsArr, setVisibleFieldsArr] = useLocalStorage<string[]>(
+    'mes_calendar_visibleFields',
+    DEFAULT_FIELD_CONFIG.filter(field => field.visible).slice(0, 3).map(field => field.fieldId)
+  );
+
 
   // Intersect: only keep fields that are both marked visible in fieldConfig AND selected in visibleFieldsArr
   const visibleFields = useMemo((): Set<string> => {
