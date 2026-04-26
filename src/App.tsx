@@ -6,7 +6,8 @@ import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2,
 import { format, isSameDay } from 'date-fns';
 import { cn } from './components/MetricCard';
 import { AnimatePresence, motion } from 'motion/react';
-import { Task } from './types';
+import { Task, CustomFieldConfig } from './types';
+import { DEFAULT_FIELD_CONFIG } from './data';
 import { useLocalStorage } from './hooks/useLocalStorage';
 
 // Lazy load heavy components that are not always visible
@@ -33,6 +34,9 @@ export default function App() {
   const [tokenResponse, setTokenResponse] = useState<string>('');
   const [syncResponse, setSyncResponse] = useState<string>('');
   const [autoCode, setAutoCode] = useState<string | undefined>();
+
+  // Load field configuration from localStorage
+  const [fieldConfig] = useLocalStorage<CustomFieldConfig[]>('mes_field_mapping_config', DEFAULT_FIELD_CONFIG);
 
   // Toast notification for auto-sync events
   const [toast, setToast] = useState<{
@@ -148,7 +152,10 @@ export default function App() {
     console.log(`[WPS Sync] Starting sync... (prev: ${prevTaskCount} tasks)`);
     try {
       setIsSyncing(true);
-      const { tasks: wpsTasks, rawData } = await syncTasksFromWps(config);
+      const { tasks: wpsTasks, rawData } = await syncTasksFromWps({
+        ...config,
+        fieldConfig,
+      });
       const elapsed = Date.now() - startTime;
       setSyncResponse(JSON.stringify(rawData, null, 2));
       if (wpsTasks.length > 0) {
@@ -463,7 +470,7 @@ export default function App() {
         {showSettings && (
           <Suspense fallback={null}>
             <SettingsModal
-              show={showSettings}
+              open={showSettings}
               onClose={() => setShowSettings(false)}
               onSync={handleSyncWPS}
               onGetToken={handleGetToken}
@@ -473,6 +480,10 @@ export default function App() {
               initialCode={autoCode}
               tokenResponse={tokenResponse}
               syncResponse={syncResponse}
+              onSaveFieldConfig={(config) => {
+                // App doesn't need to update state because SettingsModal saves directly to localStorage
+                // All views read from localStorage on mount, so no action needed here
+              }}
             />
           </Suspense>
         )}
