@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
-import { Task } from '../types';
+import { Task, CustomFieldConfig } from '../types';
+import { DEFAULT_FIELD_CONFIG } from '../data';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, addMonths, subMonths, addWeeks, subWeeks, isSameMonth } from 'date-fns';
 import { zhCN } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, LayoutGrid, Check, Settings2, FilterX } from 'lucide-react';
@@ -53,19 +54,33 @@ function matchesFilter(value: string, operator: FilterOperator, filterValue: str
   }
 }
 
-const CALENDAR_FIELDS = [
-  { id: 'id', label: '流程卡号' },
-  { id: 'productName', label: '品名颜色' },
-  { id: 'machineName', label: '机台' },
-  { id: 'plannedQuantity', label: '预计数量' },
-  { id: 'notes', label: '工艺备注' },
-];
-
 export function CalendarView({ tasks, onTaskClick, onProcessCardClick }: CalendarViewProps) {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [viewType, setViewType] = useLocalStorage<'month' | 'week'>('mes_calendar_viewType', 'month');
+  const [fieldConfig, setFieldConfig] = useLocalStorage<CustomFieldConfig[]>('mes_field_mapping_config', DEFAULT_FIELD_CONFIG);
+
+  // Generate CALENDAR_FIELDS from field config
+  const CALENDAR_FIELDS = useMemo((): { id: string; label: string }[] => {
+    return fieldConfig
+      .filter(field => field.visible)
+      .map(field => ({
+        id: field.fieldId,
+        label: field.displayName,
+      }));
+  }, [fieldConfig]);
+
+  // Initialize visible fields and intersect with fields marked as visible in fieldConfig
+  // This ensures only fields marked visible in fieldConfig can be shown in the calendar view
+  const fieldConfigVisibleIds = useMemo(() => {
+    return new Set(fieldConfig.filter(f => f.visible).map(f => f.fieldId));
+  }, [fieldConfig]);
+
   const [visibleFieldsArr, setVisibleFieldsArr] = useLocalStorage<string[]>('mes_calendar_visibleFields', ['id', 'productName', 'machineName']);
-  const visibleFields = new Set(visibleFieldsArr);
+
+  // Intersect: only keep fields that are both marked visible in fieldConfig AND selected in visibleFieldsArr
+  const visibleFields = useMemo((): Set<string> => {
+    return new Set(visibleFieldsArr.filter(id => fieldConfigVisibleIds.has(id)));
+  }, [visibleFieldsArr, fieldConfigVisibleIds]);
   const [showFieldMenu, setShowFieldMenu] = useState(false);
   const [showFilterMenu, setShowFilterMenu] = useState(false);
 
@@ -135,13 +150,16 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick }: Calenda
   };
 
   const toggleField = (id: string) => {
+    // Only allow toggling fields that are marked as visible in fieldConfig
+    if (!fieldConfigVisibleIds.has(id)) return;
+
     const next = new Set(visibleFields);
     if (next.has(id)) {
       if (next.size > 1) next.delete(id);
     } else {
       next.add(id);
     }
-    setVisibleFieldsArr(Array.from(next));
+    setVisibleFieldsArr(Array.from(next) as string[]);
   };
 
   return (
@@ -340,23 +358,67 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick }: Calenda
                   
                   <div className="flex-1 overflow-y-auto space-y-1.5 pr-1 custom-scrollbar">
                     {dayTasks.map(task => (
-                      <div 
+                      <div
                         key={task.id}
                         onClick={() => onTaskClick(task)}
                         className="text-[10px] p-1.5 rounded border border-blue-900/30 bg-blue-900/10 text-slate-300 cursor-pointer hover:opacity-80 transition-opacity flex flex-col gap-0.5"
                       >
-                        {visibleFields.has('id') && (
-                          <div
-                            className="font-mono font-bold cursor-pointer hover:underline"
-                            onClick={(e) => { e.stopPropagation(); onProcessCardClick(task); }}
-                          >
-                            {task.id}
-                          </div>
-                        )}
-                        {visibleFields.has('productName') && <div className="truncate">{task.productName}</div>}
-                        {visibleFields.has('machineName') && <div className="truncate text-slate-500">{task.machineName}</div>}
-                        {visibleFields.has('plannedQuantity') && <div className="truncate text-slate-500">{task.plannedQuantity}m</div>}
-                        {visibleFields.has('notes') && <div className="text-slate-500 whitespace-normal break-words">{task.notes}</div>}
+                        {/* Render fields dynamically based on visibleFields */}
+                        {CALENDAR_FIELDS.filter(field => visibleFields.has(field.id)).map(field => {
+                          const value = task[field.id as keyof Task];
+
+                          // Special handling for id field with click handler
+                          if (field.id === 'id') {
+                            return (
+                              <div
+                                key={field.id}
+                                className="font-mono font-bold cursor-pointer hover:underline"
+                                onClick={(e) => { e.stopPropagation(); onProcessCardClick(task); }}
+                              >
+                                {value}
+                              </div>
+                            );
+                          }
+
+                          // Special handling for plannedQuantity to add 'm' suffix
+                          if (field.id === 'plannedQuantity') {
+                            return (
+                              <div key={field.id} className="truncate text-slate-500">
+                                {value}m
+                              </div>
+                            );
+                          }
+
+                          // Special handling for notes to allow wrapping
+                          if (field.id === 'notes') {
+                            return value ? (
+                              <div key={field.id} className="text-slate-500 whitespace-normal break-words">
+                                {value}
+                              </div>
+                            ) : null;
+                          }
+
+                          // Special handling for date fields
+                          if (field.id === 'startTime' || field.id === 'endTime') {
+                            try {
+                              const dateValue = new Date(value as string);
+                              return (
+                                <div key={field.id} className="truncate text-slate-500">
+                                  {format(dateValue, 'MM-dd HH:mm')}
+                                </div>
+                              );
+                            } catch {
+                              return null;
+                            }
+                          }
+
+                          // Default rendering for all other fields
+                          return value ? (
+                            <div key={field.id} className="truncate text-slate-500">
+                              {value}
+                            </div>
+                          ) : null;
+                        })}
                       </div>
                     ))}
                   </div>
