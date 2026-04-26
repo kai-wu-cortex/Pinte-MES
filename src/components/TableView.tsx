@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
-import { Task } from '../types';
+import { Task, CustomFieldConfig } from '../types';
+import { DEFAULT_FIELD_CONFIG } from '../data';
 import { cn } from './MetricCard';
 import { Columns, Rows, Check, ListTree, ChevronDown, ChevronRight, GripVertical, FilterX, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
@@ -62,25 +63,61 @@ const spacingStyles = {
   relaxed: 'px-6 py-4',
 };
 
-const COLUMNS = [
-  { id: 'startTime', label: '日期', defaultWidth: 120, groupable: true },
-  { id: 'id', label: '流程卡号', defaultWidth: 120, groupable: false },
-  { id: 'process', label: '工艺', defaultWidth: 100, groupable: true },
-  { id: 'machineName', label: '机台', defaultWidth: 120, groupable: true },
-  { id: 'productName', label: '品名颜色', defaultWidth: 200, groupable: true },
-  { id: 'specification', label: '规格', defaultWidth: 150, groupable: true },
-  { id: 'plannedQuantity', label: '预计数量/m', defaultWidth: 120, groupable: false },
-  { id: 'actualOutput', label: '实际产出', defaultWidth: 120, groupable: false },
-  { id: 'slittingQuantity', label: '分切数量', defaultWidth: 120, groupable: false },
-  {id: 'shippedQuantity', label: '实际出货数量', defaultWidth: 120, groupable: false },
-  { id: 'notes', label: '工艺备注', defaultWidth: 200, groupable: true },
-];
+// Helper to determine if a field is groupable
+function isGroupableField(fieldId: string): boolean {
+  const groupableFields = ['startTime', 'process', 'machineName', 'productName', 'specification', 'notes'];
+  return groupableFields.includes(fieldId);
+}
+
+// Helper to get default width for a field
+function getDefaultWidth(fieldId: string): number {
+  const widthMap: Record<string, number> = {
+    startTime: 120,
+    id: 120,
+    process: 100,
+    machineName: 120,
+    productName: 200,
+    specification: 150,
+    plannedQuantity: 120,
+    actualOutput: 120,
+    slittingQuantity: 120,
+    shippedQuantity: 120,
+    notes: 200,
+  };
+  return widthMap[fieldId] || 150;
+}
 
 export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewProps) {
+  const [fieldConfig, setFieldConfig] = useLocalStorage<CustomFieldConfig[]>('mes_field_mapping_config', DEFAULT_FIELD_CONFIG);
   const [spacing, setSpacing] = useLocalStorage<Spacing>('mes_table_spacing', 'compact');
+
+  // Generate columns from field config
+  const COLUMNS = useMemo(() => {
+    return fieldConfig
+      .filter(field => field.visible)
+      .map(field => ({
+        id: field.fieldId,
+        label: field.displayName,
+        defaultWidth: getDefaultWidth(field.fieldId),
+        groupable: isGroupableField(field.fieldId),
+      }));
+  }, [fieldConfig]);
+
+  // Initialize column order and visible columns from field config
   const [columnOrder, setColumnOrder] = useLocalStorage<string[]>('mes_table_columnOrder', COLUMNS.map(c => c.id));
+
+  // Initialize visible columns and intersect with fields marked as visible in fieldConfig
+  // This ensures only fields marked visible in fieldConfig can be shown in the table
+  const fieldConfigVisibleIds = useMemo(() => {
+    return new Set(fieldConfig.filter(f => f.visible).map(f => f.fieldId));
+  }, [fieldConfig]);
+
   const [visibleColsArr, setVisibleColsArr] = useLocalStorage<string[]>('mes_table_visibleCols', COLUMNS.map(c => c.id));
-  const visibleCols = new Set(visibleColsArr);
+
+  // Intersect: only keep columns that are both marked visible in fieldConfig AND selected in visibleColsArr
+  const visibleCols = useMemo((): Set<string> => {
+    return new Set(visibleColsArr.filter(id => fieldConfigVisibleIds.has(id)));
+  }, [visibleColsArr, fieldConfigVisibleIds]);
   const [showColMenu, setShowColMenu] = useState(false);
   const [showSpacingMenu, setShowSpacingMenu] = useState(false);
   const [showGroupMenu, setShowGroupMenu] = useState(false);
@@ -122,13 +159,16 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
   };
 
   const toggleCol = (id: string) => {
+    // Only allow toggling columns that are marked as visible in fieldConfig
+    if (!fieldConfigVisibleIds.has(id)) return;
+
     const next = new Set(visibleCols);
     if (next.has(id)) {
       if (next.size > 1) next.delete(id);
     } else {
       next.add(id);
     }
-    setVisibleColsArr(Array.from(next));
+    setVisibleColsArr(Array.from(next) as string[]);
   };
   
   // Reorder COLUMNS based on columnOrder
