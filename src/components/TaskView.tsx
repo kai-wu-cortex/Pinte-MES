@@ -172,6 +172,22 @@ export function TaskView({ tasks, onTaskClick, onProcessCardClick }: TaskViewPro
 
   const [visibleFieldsArr, setVisibleFieldsArr] = useLocalStorage<string[]>('mes_task_visibleFields', (TASK_FIELDS.map(f => f.id) as unknown) as string[]);
 
+  // Automatically add any new visible fields from fieldConfig that are not already in visibleFieldsArr
+  useMemo(() => {
+    const allVisibleIds: string[] = Array.from(fieldConfigVisibleIds);
+    const hasNewFields = allVisibleIds.some((id: string) => !visibleFieldsArr.includes(id));
+    if (hasNewFields) {
+      // Add any missing fields to visibleFieldsArr (new fields should be visible by default)
+      const newVisible = [...visibleFieldsArr];
+      allVisibleIds.forEach((id: string) => {
+        if (!newVisible.includes(id)) {
+          newVisible.push(id);
+        }
+      });
+      setVisibleFieldsArr(newVisible);
+    }
+  }, [fieldConfigVisibleIds, visibleFieldsArr, setVisibleFieldsArr]);
+
   // Intersect: only keep fields that are both marked visible in fieldConfig AND selected in visibleFieldsArr
   const visibleFields = useMemo((): Set<string> => {
     return new Set(visibleFieldsArr.filter(id => fieldConfigVisibleIds.has(id)));

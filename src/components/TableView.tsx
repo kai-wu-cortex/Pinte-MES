@@ -106,6 +106,22 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
   // Initialize column order and visible columns from field config
   const [columnOrder, setColumnOrder] = useLocalStorage<string[]>('mes_table_columnOrder', COLUMNS.map(c => c.id));
 
+  // Automatically add any new visible fields from fieldConfig that are not already in columnOrder
+  useMemo(() => {
+    const allColumnIds = COLUMNS.map(c => c.id);
+    const hasNewColumns = allColumnIds.some((id: string) => !columnOrder.includes(id));
+    if (hasNewColumns) {
+      // Add any missing columns to the end of the order
+      const newOrder = [...columnOrder];
+      allColumnIds.forEach((id: string) => {
+        if (!newOrder.includes(id)) {
+          newOrder.push(id);
+        }
+      });
+      setColumnOrder(newOrder);
+    }
+  }, [COLUMNS, columnOrder, setColumnOrder]);
+
   // Initialize visible columns and intersect with fields marked as visible in fieldConfig
   // This ensures only fields marked visible in fieldConfig can be shown in the table
   const fieldConfigVisibleIds = useMemo(() => {
@@ -113,6 +129,22 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
   }, [fieldConfig]);
 
   const [visibleColsArr, setVisibleColsArr] = useLocalStorage<string[]>('mes_table_visibleCols', COLUMNS.map(c => c.id));
+
+  // Automatically add any new visible fields from fieldConfig that are not already in visibleColsArr
+  useMemo(() => {
+    const allVisibleIds: string[] = Array.from(fieldConfigVisibleIds);
+    const hasNewFields = allVisibleIds.some((id: string) => !visibleColsArr.includes(id));
+    if (hasNewFields) {
+      // Add any missing fields to visibleColsArr (new fields should be visible by default)
+      const newVisible = [...visibleColsArr];
+      allVisibleIds.forEach((id: string) => {
+        if (!newVisible.includes(id)) {
+          newVisible.push(id);
+        }
+      });
+      setVisibleColsArr(newVisible);
+    }
+  }, [fieldConfigVisibleIds, visibleColsArr, setVisibleColsArr]);
 
   // Intersect: only keep columns that are both marked visible in fieldConfig AND selected in visibleColsArr
   const visibleCols = useMemo((): Set<string> => {
@@ -210,6 +242,21 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
     }
     return initial;
   });
+
+  // Add default widths for any new columns that don't have widths yet
+  useEffect(() => {
+    let hasNewColumns = false;
+    const newColWidths = { ...colWidths };
+    COLUMNS.forEach(c => {
+      if (newColWidths[c.id] === undefined) {
+        newColWidths[c.id] = c.defaultWidth;
+        hasNewColumns = true;
+      }
+    });
+    if (hasNewColumns) {
+      setColWidths(newColWidths);
+    }
+  }, [COLUMNS, colWidths]);
 
   useEffect(() => {
     localStorage.setItem('mes_table_col_widths', JSON.stringify(colWidths));
