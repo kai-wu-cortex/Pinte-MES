@@ -3,6 +3,7 @@ import { X, Plus, Trash2, ExternalLink, AlertCircle, RefreshCw, Save, Database, 
 import { getWpsAuthorizationUrl, extractHeadersFromRawResponse } from '../services/wps';
 import { DEFAULT_FIELD_CONFIG } from '../data';
 import { CustomFieldConfig } from '../types';
+import { loadWpsConfig } from './wpsConfig';
 
 interface SettingsModalProps {
   onClose: () => void;
@@ -18,60 +19,11 @@ interface SettingsModalProps {
   show?: boolean;
 }
 
-// Load saved config from localStorage on initialization
-const loadSavedConfig = () => {
-  const saved = localStorage.getItem('wps_config');
-  if (saved) {
-    try {
-      const parsed = JSON.parse(saved);
-      // Ensure all fields exist with defaults
-      return {
-        apiUrl: 'https://openapi.wps.cn',
-        appId: '',
-        appKey: '',
-        fileId: '',
-        worksheetId: 1,
-        rowFrom: 0,
-        rowTo: 9999,
-        colFrom: 0,
-        colTo: 30,
-        code: '',
-        ...parsed,
-      };
-    } catch {
-      return {
-        apiUrl: 'https://openapi.wps.cn',
-        appId: '',
-        appKey: '',
-        fileId: '',
-        worksheetId: 1,
-        rowFrom: 0,
-        rowTo: 9999,
-        colFrom: 0,
-        colTo: 30,
-        code: '',
-      };
-    }
-  }
-  return {
-    apiUrl: 'https://openapi.wps.cn',
-    appId: '',
-    appKey: '',
-    fileId: '',
-    worksheetId: 1,
-    rowFrom: 0,
-    rowTo: 9999,
-    colFrom: 0,
-    colTo: 30,
-    code: '',
-  };
-};
-
 export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tokenStatus, isGettingToken, initialCode, tokenResponse, syncResponse, onSaveFieldConfig, show }: SettingsModalProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [config, setConfig] = useState(() => {
-    const saved = loadSavedConfig();
+    const saved = loadWpsConfig(import.meta.env);
     if (initialCode && initialCode.trim()) {
       return { ...saved, code: initialCode };
     }
