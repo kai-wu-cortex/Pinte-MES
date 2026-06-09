@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { Task, CustomFieldConfig } from './types';
 import { DEFAULT_FIELD_CONFIG } from './data';
 import { useLocalStorage } from './hooks/useLocalStorage';
+import { getNextDailySyncDelayMs } from './syncSchedule';
 
 // Lazy load heavy components that are not always visible
 const TableView = React.lazy(() => import('./components/TableView').then(m => ({ default: m.TableView })));
@@ -273,23 +274,24 @@ export default function App() {
     autoSync();
   }, []);
 
-  // Periodic auto-sync: check for remote changes every 1 minute (60000 ms)
-  // handleSyncTasksFromWps is stable (useCallback with empty deps) so this only runs once
   useEffect(() => {
-    const AUTO_SYNC_INTERVAL = 60000; // 1 minute
-    const timer = setInterval(async () => {
+    let timer: ReturnType<typeof setTimeout>;
+
+    const syncAndScheduleNext = async () => {
       if (import.meta.env.VITE_WPS_APP_ID && import.meta.env.VITE_WPS_SPREADSHEET_ID) {
         const savedConfig = getSavedWpsConfig();
         try {
           await handleSyncTasksFromWps(savedConfig);
-          console.log('Periodic auto-sync completed');
+          console.log('Scheduled WPS sync completed');
         } catch (err) {
-          console.error('Periodic WPS sync failed:', err);
-          // Don't clear existing data on error
+          console.error('Scheduled WPS sync failed:', err);
         }
       }
-    }, AUTO_SYNC_INTERVAL);
-    return () => clearInterval(timer);
+      timer = setTimeout(syncAndScheduleNext, getNextDailySyncDelayMs());
+    };
+
+    timer = setTimeout(syncAndScheduleNext, getNextDailySyncDelayMs());
+    return () => clearTimeout(timer);
   }, []);
 
   return (
