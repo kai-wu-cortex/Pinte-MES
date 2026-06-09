@@ -8,6 +8,7 @@ import { cn } from './MetricCard';
 
 interface ProcessCardViewProps {
   tasks: Task[];
+  totalTaskCount?: number;
   onTaskClick: (task: Task) => void;
   onProcessCardClick: (task: Task) => void;
 }
@@ -29,18 +30,43 @@ type ProcessField = {
 };
 
 const PROCESS_CARD_GRID_COLUMNS: Record<CardSize, string> = {
-  sm: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8',
-  md: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6',
-  lg: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5',
+  sm: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4',
+  md: 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3',
+  lg: 'grid-cols-1 lg:grid-cols-2',
 };
 
 const PROCESS_CARD_DEFAULT_FIELDS = ['id', 'process', 'productName', 'plannedQuantity', 'specification', 'machineName', 'startTime', 'notes'];
+const PROCESS_CARD_PAGE_SIZE = 48;
 
-const PROCESS_STAGES = [
-  { id: '涂布', label: '涂布', englishLabel: 'Coating' },
-  { id: '模压', label: '模压', englishLabel: 'Embossing' },
-  { id: '分切', label: '分切', englishLabel: 'Slitting' },
-];
+export const PROCESS_FLOW_ORDER = ['涂布', '模压', '分切'];
+
+const PROCESS_STAGE_CONFIG: Record<string, Omit<ProcessStage, 'status'>> = {
+  涂布: { id: '涂布', label: '涂布', englishLabel: 'Coating' },
+  模压: { id: '模压', label: '模压', englishLabel: 'Embossing' },
+  分切: { id: '分切', label: '分切', englishLabel: 'Slitting' },
+};
+
+const PROCESS_STAGES = PROCESS_FLOW_ORDER.map(process => PROCESS_STAGE_CONFIG[process]);
+
+export function resolveProcessFlowStages(flowOrder: string[], tasks: Task[] = []): Omit<ProcessStage, 'status'>[] {
+  const taskProcesses = Array.from(new Set(tasks.map(task => task.process).filter(Boolean)));
+  const configuredProcesses = flowOrder.filter(process => PROCESS_STAGE_CONFIG[process]);
+  const processNames = taskProcesses.length > 0
+    ? taskProcesses
+    : configuredProcesses.length > 0
+      ? configuredProcesses
+      : PROCESS_FLOW_ORDER;
+  const sortedProcessNames = [
+    ...flowOrder.filter(process => processNames.includes(process)),
+    ...processNames.filter(process => !flowOrder.includes(process)),
+  ];
+
+  return sortedProcessNames.map(process => PROCESS_STAGE_CONFIG[process] ?? {
+    id: process,
+    label: process,
+    englishLabel: process,
+  });
+}
 
 const PROCESS_STAGE_THEMES = {
   涂布: {
@@ -61,9 +87,9 @@ export function getProcessStageTheme(process: string) {
   return PROCESS_STAGE_THEMES[process as keyof typeof PROCESS_STAGE_THEMES] ?? PROCESS_STAGE_THEMES.涂布;
 }
 
-export function getProcessStages(process: string): ProcessStage[] {
-  const activeIndex = Math.max(0, PROCESS_STAGES.findIndex(stage => stage.id === process));
-  return PROCESS_STAGES.map((stage, index) => ({
+export function getProcessStages(process: string, flowOrder = PROCESS_STAGES): ProcessStage[] {
+  const activeIndex = Math.max(0, flowOrder.findIndex(stage => stage.id === process));
+  return flowOrder.map((stage, index) => ({
     ...stage,
     status: index < activeIndex ? 'done' : index === activeIndex ? 'active' : 'pending',
   }));
@@ -93,6 +119,15 @@ export function isProcessFieldVisible(visibleFields: Set<string>, fieldId: strin
   return visibleFields.has(fieldId);
 }
 
+export function getProcessSummaryText(visibleCount: number, totalCount: number): string {
+  if (visibleCount === totalCount) return `当前显示 ${visibleCount} 张流程卡`;
+  return `当前显示 ${visibleCount} / ${totalCount} 张流程卡`;
+}
+
+export function getVisibleProcessTasks(tasks: Task[], visibleLimit: number): Task[] {
+  return tasks.slice(0, visibleLimit);
+}
+
 function formatDate(value: string): string {
   try {
     return format(new Date(value), 'yyyy-MM-dd');
@@ -115,8 +150,8 @@ function StageIcon({ stage, className }: { stage: ProcessStage; className?: stri
   return <ChevronsRight className={className} />;
 }
 
-function ProcessStageTimeline({ process }: { process: string }) {
-  const stages = getProcessStages(process);
+function ProcessStageTimeline({ process, flowStages }: { process: string; flowStages: Omit<ProcessStage, 'status'>[] }) {
+  const stages = getProcessStages(process, flowStages);
   const progressWidth = getProgressWidth(stages);
 
   return (
@@ -154,8 +189,8 @@ function ProcessStageTimeline({ process }: { process: string }) {
   );
 }
 
-const ProcessGridCard: React.FC<{ task: Task; onTaskClick: (task: Task) => void; onProcessCardClick: (task: Task) => void; size: CardSize; visibleFields: Set<string> }> = ({ task, onTaskClick, onProcessCardClick, size, visibleFields }) => {
-  const stages = getProcessStages(task.process);
+const ProcessGridCard: React.FC<{ task: Task; onTaskClick: (task: Task) => void; onProcessCardClick: (task: Task) => void; size: CardSize; visibleFields: Set<string>; flowStages: Omit<ProcessStage, 'status'>[] }> = ({ task, onTaskClick, onProcessCardClick, size, visibleFields, flowStages }) => {
+  const stages = getProcessStages(task.process, flowStages);
   const theme = getProcessStageTheme(task.process);
   const activeStage = stages.find(stage => stage.status === 'active') ?? stages[0];
   const cardSizeClasses = {
@@ -252,7 +287,7 @@ const ProcessGridCard: React.FC<{ task: Task; onTaskClick: (task: Task) => void;
   );
 };
 
-const ProcessRow: React.FC<{ task: Task; onTaskClick: (task: Task) => void; onProcessCardClick: (task: Task) => void; visibleFields: Set<string> }> = ({ task, onTaskClick, onProcessCardClick, visibleFields }) => {
+const ProcessRow: React.FC<{ task: Task; onTaskClick: (task: Task) => void; onProcessCardClick: (task: Task) => void; visibleFields: Set<string>; flowStages: Omit<ProcessStage, 'status'>[] }> = ({ task, onTaskClick, onProcessCardClick, visibleFields, flowStages }) => {
   const hasAlert = Boolean(task.notes?.trim());
 
   return (
@@ -306,7 +341,7 @@ const ProcessRow: React.FC<{ task: Task; onTaskClick: (task: Task) => void; onPr
         </div>
       </div>
 
-      <ProcessStageTimeline process={task.process} />
+      <ProcessStageTimeline process={task.process} flowStages={flowStages} />
 
       <div className="w-80 shrink-0 flex flex-col justify-center border-l border-slate-700/80 pl-4">
         <div className="flex justify-between items-center mb-1">
@@ -336,14 +371,17 @@ const ProcessRow: React.FC<{ task: Task; onTaskClick: (task: Task) => void; onPr
   );
 }
 
-export function ProcessCardView({ tasks, onTaskClick, onProcessCardClick }: ProcessCardViewProps) {
+export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskClick, onProcessCardClick }: ProcessCardViewProps) {
   const [fieldConfig] = useLocalStorage<CustomFieldConfig[]>('mes_field_mapping_config', DEFAULT_FIELD_CONFIG);
   const [displayMode, setDisplayMode] = useState<'list' | 'grid'>('list');
   const [cardSize, setCardSize] = useLocalStorage<CardSize>('mes_process_cardSize', 'md');
   const [groupBy, setGroupBy] = useLocalStorage<string>('mes_process_groupBy', 'none');
+  const [flowOrder, setFlowOrder] = useLocalStorage<string[]>('mes_process_flowOrder', PROCESS_FLOW_ORDER);
   const [showFieldMenu, setShowFieldMenu] = useState(false);
   const [showSizeMenu, setShowSizeMenu] = useState(false);
   const [showGroupMenu, setShowGroupMenu] = useState(false);
+  const [showFlowMenu, setShowFlowMenu] = useState(false);
+  const [visibleLimit, setVisibleLimit] = useState(PROCESS_CARD_PAGE_SIZE);
   const processFields = useMemo<ProcessField[]>(() => {
     return fieldConfig
       .filter(field => field.visible && PROCESS_CARD_DEFAULT_FIELDS.includes(field.fieldId))
@@ -360,11 +398,26 @@ export function ProcessCardView({ tasks, onTaskClick, onProcessCardClick }: Proc
     if (nextVisible !== visibleFieldsArr) setVisibleFieldsArr(nextVisible);
   }, [availableFieldIds, visibleFieldsArr, setVisibleFieldsArr]);
 
+  useEffect(() => {
+    setVisibleLimit(PROCESS_CARD_PAGE_SIZE);
+  }, [tasks, groupBy, displayMode]);
+
   const visibleFields = useMemo<Set<string>>(() => new Set(visibleFieldsArr.filter(id => fieldConfigVisibleIds.has(id))), [visibleFieldsArr, fieldConfigVisibleIds]);
   const sortedTasks = useMemo(() => {
     return [...tasks].sort((a, b) => a.id.localeCompare(b.id));
   }, [tasks]);
-  const groupedTasks = useMemo(() => groupProcessTasks(sortedTasks, groupBy), [sortedTasks, groupBy]);
+  const flowStages = useMemo(() => resolveProcessFlowStages(flowOrder, sortedTasks), [flowOrder, sortedTasks]);
+  const moveFlowStage = (stageId: string, direction: -1 | 1) => {
+    const currentOrder = flowStages.map(stage => stage.id);
+    const index = currentOrder.indexOf(stageId);
+    const nextIndex = index + direction;
+    if (index < 0 || nextIndex < 0 || nextIndex >= currentOrder.length) return;
+    const nextOrder = [...currentOrder];
+    [nextOrder[index], nextOrder[nextIndex]] = [nextOrder[nextIndex], nextOrder[index]];
+    setFlowOrder(nextOrder);
+  };
+  const visibleTasks = useMemo(() => getVisibleProcessTasks(sortedTasks, visibleLimit), [sortedTasks, visibleLimit]);
+  const groupedTasks = useMemo(() => groupProcessTasks(visibleTasks, groupBy), [visibleTasks, groupBy]);
   const toggleField = (id: string) => {
     if (!fieldConfigVisibleIds.has(id)) return;
     const next = new Set<string>(visibleFields);
@@ -379,14 +432,19 @@ export function ProcessCardView({ tasks, onTaskClick, onProcessCardClick }: Proc
   return (
     <div className="h-full flex flex-col gap-4 overflow-hidden">
       <div className="flex items-center justify-between shrink-0">
-        <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-          <Factory className="w-5 h-5 text-cyan-300" />
-          流程卡号视图
-        </h2>
+        <div>
+          <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
+            <Factory className="w-5 h-5 text-cyan-300" />
+            流程卡号视图
+          </h2>
+          <p className="mt-1 text-xs font-mono text-slate-400">
+            {getProcessSummaryText(sortedTasks.length, totalTaskCount)}{sortedTasks.length > visibleTasks.length ? `，已加载 ${visibleTasks.length} 张` : ''}
+          </p>
+        </div>
         <div className="flex items-center gap-2">
           <div className="relative">
             <button
-              onClick={() => { setShowGroupMenu(!showGroupMenu); setShowSizeMenu(false); setShowFieldMenu(false); }}
+              onClick={() => { setShowGroupMenu(!showGroupMenu); setShowSizeMenu(false); setShowFieldMenu(false); setShowFlowMenu(false); }}
               className="bg-slate-950 hover:bg-slate-800 text-slate-200 px-3 py-1 rounded-md font-mono text-xs transition-colors border border-slate-700 flex items-center gap-1"
             >
               <ListTree className="w-3 h-3" /> 分组: {groupBy === 'none' ? '无' : processFields.find(field => field.id === groupBy)?.label || groupBy}
@@ -418,7 +476,51 @@ export function ProcessCardView({ tasks, onTaskClick, onProcessCardClick }: Proc
           </div>
           <div className="relative">
             <button
-              onClick={() => { setShowSizeMenu(!showSizeMenu); setShowGroupMenu(false); setShowFieldMenu(false); }}
+              onClick={() => { setShowFlowMenu(!showFlowMenu); setShowGroupMenu(false); setShowSizeMenu(false); setShowFieldMenu(false); }}
+              className="bg-slate-950 hover:bg-slate-800 text-slate-200 px-3 py-1 rounded-md font-mono text-xs transition-colors border border-slate-700 flex items-center gap-1"
+            >
+              <ChevronsRight className="w-3 h-3" /> 流转顺序: {flowStages.map(stage => stage.label).join(' → ')}
+            </button>
+            {showFlowMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowFlowMenu(false)} />
+                <div className="absolute right-0 top-full mt-1 z-50 w-64 bg-slate-800 border border-blue-900/50 rounded-lg shadow-xl py-2 overflow-hidden">
+                  {flowStages.map((stage, index) => (
+                    <div key={stage.id} className="flex items-center justify-between px-3 py-2 text-xs text-slate-300">
+                      <span className="font-mono">{index + 1}. {stage.label}</span>
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => moveFlowStage(stage.id, -1)}
+                          disabled={index === 0}
+                          className="px-2 py-0.5 rounded border border-slate-600 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-700"
+                        >
+                          上移
+                        </button>
+                        <button
+                          onClick={() => moveFlowStage(stage.id, 1)}
+                          disabled={index === flowStages.length - 1}
+                          className="px-2 py-0.5 rounded border border-slate-600 text-slate-300 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-700"
+                        >
+                          下移
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="border-t border-slate-700 mt-1 pt-1 px-2">
+                    <button
+                      onClick={() => setFlowOrder(PROCESS_FLOW_ORDER)}
+                      className="w-full text-left px-2 py-1.5 text-xs text-cyan-200 hover:bg-slate-700 rounded"
+                    >
+                      恢复默认：涂布 → 模压 → 分切
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => { setShowSizeMenu(!showSizeMenu); setShowGroupMenu(false); setShowFieldMenu(false); setShowFlowMenu(false); }}
               className="bg-slate-950 hover:bg-slate-800 text-slate-200 px-3 py-1 rounded-md font-mono text-xs transition-colors border border-slate-700 flex items-center gap-1"
             >
               <LayoutGrid className="w-3 h-3" /> 卡片大小
@@ -447,7 +549,7 @@ export function ProcessCardView({ tasks, onTaskClick, onProcessCardClick }: Proc
           </div>
           <div className="relative">
             <button
-              onClick={() => { setShowFieldMenu(!showFieldMenu); setShowGroupMenu(false); setShowSizeMenu(false); }}
+              onClick={() => { setShowFieldMenu(!showFieldMenu); setShowGroupMenu(false); setShowSizeMenu(false); setShowFlowMenu(false); }}
               className="bg-slate-950 hover:bg-slate-800 text-slate-200 px-3 py-1 rounded-md font-mono text-xs transition-colors border border-slate-700 flex items-center gap-1"
             >
               <Settings2 className="w-3 h-3" /> 显示设置
@@ -521,6 +623,7 @@ export function ProcessCardView({ tasks, onTaskClick, onProcessCardClick }: Proc
                       onProcessCardClick={onProcessCardClick}
                       size={cardSize}
                       visibleFields={visibleFields}
+                      flowStages={flowStages}
                     />
                   ))}
                 </div>
@@ -533,12 +636,23 @@ export function ProcessCardView({ tasks, onTaskClick, onProcessCardClick }: Proc
                       onTaskClick={onTaskClick}
                       onProcessCardClick={onProcessCardClick}
                       visibleFields={visibleFields}
+                      flowStages={flowStages}
                     />
                   ))}
                 </div>
               )}
             </div>
           ))}
+          {visibleTasks.length < sortedTasks.length && (
+            <div className="flex justify-center pt-1">
+              <button
+                onClick={() => setVisibleLimit(limit => limit + PROCESS_CARD_PAGE_SIZE)}
+                className="px-4 py-2 rounded-lg border border-cyan-400/30 bg-cyan-400/10 text-cyan-100 text-xs font-mono hover:bg-cyan-400/20 transition-colors"
+              >
+                加载更多流程卡（{visibleTasks.length}/{sortedTasks.length}）
+              </button>
+            </div>
+          )}
         </section>
       )}
     </div>
