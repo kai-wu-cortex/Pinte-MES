@@ -128,6 +128,22 @@ export function getVisibleProcessTasks(tasks: Task[], visibleLimit: number): Tas
   return tasks.slice(0, visibleLimit);
 }
 
+export function getFilteredProcessTasks(tasks: Task[], query: string): Task[] {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return tasks;
+
+  return tasks.filter(task => [
+    task.id,
+    task.process,
+    task.productName,
+    task.machineName,
+    task.specification,
+    task.operator,
+    task.notes,
+    formatDate(task.startTime),
+  ].some(value => String(value || '').toLowerCase().includes(normalizedQuery)));
+}
+
 function formatDate(value: string): string {
   try {
     return format(new Date(value), 'yyyy-MM-dd');
@@ -381,6 +397,7 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
   const [showSizeMenu, setShowSizeMenu] = useState(false);
   const [showGroupMenu, setShowGroupMenu] = useState(false);
   const [showFlowMenu, setShowFlowMenu] = useState(false);
+  const [filterQuery, setFilterQuery] = useState('');
   const [visibleLimit, setVisibleLimit] = useState(PROCESS_CARD_PAGE_SIZE);
   const processFields = useMemo<ProcessField[]>(() => {
     return fieldConfig
@@ -400,12 +417,13 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
 
   useEffect(() => {
     setVisibleLimit(PROCESS_CARD_PAGE_SIZE);
-  }, [tasks, groupBy, displayMode]);
+  }, [tasks, groupBy, displayMode, filterQuery]);
 
   const visibleFields = useMemo<Set<string>>(() => new Set(visibleFieldsArr.filter(id => fieldConfigVisibleIds.has(id))), [visibleFieldsArr, fieldConfigVisibleIds]);
+  const filteredProcessTasks = useMemo(() => getFilteredProcessTasks(tasks, filterQuery), [tasks, filterQuery]);
   const sortedTasks = useMemo(() => {
-    return [...tasks].sort((a, b) => a.id.localeCompare(b.id));
-  }, [tasks]);
+    return [...filteredProcessTasks].sort((a, b) => a.id.localeCompare(b.id));
+  }, [filteredProcessTasks]);
   const flowStages = useMemo(() => resolveProcessFlowStages(flowOrder, sortedTasks), [flowOrder, sortedTasks]);
   const moveFlowStage = (stageId: string, direction: -1 | 1) => {
     const currentOrder = flowStages.map(stage => stage.id);
@@ -430,7 +448,7 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
   };
 
   return (
-    <div className="h-full flex flex-col gap-4 overflow-hidden">
+    <div className="h-full flex flex-col gap-4 overflow-hidden min-w-0">
       <div className="flex items-center justify-between shrink-0">
         <div>
           <h2 className="text-lg font-bold text-slate-100 flex items-center gap-2">
@@ -442,6 +460,16 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
           </p>
         </div>
         <div className="flex items-center gap-2">
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-500" />
+            <input
+              type="text"
+              value={filterQuery}
+              onChange={(event) => setFilterQuery(event.target.value)}
+              placeholder="筛选流程卡..."
+              className="w-44 bg-slate-950 border border-slate-700 rounded-md py-1 pl-8 pr-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+            />
+          </div>
           <div className="relative">
             <button
               onClick={() => { setShowGroupMenu(!showGroupMenu); setShowSizeMenu(false); setShowFieldMenu(false); setShowFlowMenu(false); }}
@@ -605,7 +633,7 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
           <Search className="w-4 h-4 mr-2" /> 没有匹配的流程卡
         </div>
       ) : (
-        <section className="flex-1 overflow-y-auto pr-2 pb-4 space-y-5">
+        <section className="flex-1 overflow-y-auto overflow-x-hidden pr-2 pb-4 space-y-5 min-w-0">
           {Object.entries(groupedTasks as Record<string, Task[]>).map(([groupName, groupTasks]) => (
             <div key={groupName} className="space-y-3">
               {groupBy !== 'none' && (

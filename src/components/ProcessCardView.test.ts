@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { PROCESS_FLOW_ORDER, getProcessCardGridColumns, getProcessStageTheme, getProcessStages, getProcessSummaryText, getVisibleProcessTasks, groupProcessTasks, isProcessFieldVisible, mergeNewProcessFields, resolveProcessFlowStages } from './ProcessCardView';
+import { PROCESS_FLOW_ORDER, getFilteredProcessTasks, getProcessCardGridColumns, getProcessStageTheme, getProcessStages, getProcessSummaryText, getVisibleProcessTasks, groupProcessTasks, isProcessFieldVisible, mergeNewProcessFields, resolveProcessFlowStages } from './ProcessCardView';
 
 assert.deepEqual(
   getProcessStages('模压').map(stage => stage.status),
@@ -79,3 +79,12 @@ const visibleTasks = getVisibleProcessTasks(
 assert.equal(visibleTasks.length, 48);
 assert.equal(visibleTasks[47].id, '47');
 assert.equal(getVisibleProcessTasks([{ id: 'A', process: '涂布' }] as any, 48).length, 1);
+
+const filterTasks = [
+  { id: 'FC-001', process: '涂布', productName: '亮金', machineName: 'A1', specification: '12μm', operator: '张三', notes: '加急', startTime: '2026-06-10T08:00:00.000Z' },
+  { id: 'FC-002', process: '分切', productName: '哑银', machineName: 'B2', specification: '18μm', operator: '李四', notes: '', startTime: '2026-06-11T08:00:00.000Z' },
+] as any;
+assert.deepEqual(getFilteredProcessTasks(filterTasks, '').map((task: any) => task.id), ['FC-001', 'FC-002']);
+assert.deepEqual(getFilteredProcessTasks(filterTasks, '亮金').map((task: any) => task.id), ['FC-001']);
+assert.deepEqual(getFilteredProcessTasks(filterTasks, 'B2').map((task: any) => task.id), ['FC-002']);
+assert.deepEqual(getFilteredProcessTasks(filterTasks, '2026-06-10').map((task: any) => task.id), ['FC-001']);

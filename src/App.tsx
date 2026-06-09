@@ -3,13 +3,14 @@ import { MetricCard } from './components/MetricCard';
 import { INITIAL_TASKS, MACHINES } from './data';
 import { fetchTasksFromWps, getWpsAccessToken, getCellAttachments, cachedToken, syncTasksFromWps } from './services/wps';
 import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Search, Loader2, CheckCircle, XCircle, Factory } from 'lucide-react';
-import { format, isSameDay } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from './components/MetricCard';
 import { AnimatePresence, motion } from 'motion/react';
 import { Task, CustomFieldConfig } from './types';
 import { DEFAULT_FIELD_CONFIG } from './data';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { getNextDailySyncDelayMs } from './syncSchedule';
+import { isTaskOnDate } from './dateFilters';
 
 // Lazy load heavy components that are not always visible
 const TableView = React.lazy(() => import('./components/TableView').then(m => ({ default: m.TableView })));
@@ -81,22 +82,10 @@ export default function App() {
     return () => clearInterval(timer);
   }, []);
 
-  // Safe date parsing for filtering
-  const getSafeDate = (dateStr: string): Date => {
-    try {
-      const d = new Date(dateStr);
-      if (isNaN(d.getTime())) {
-        return new Date();
-      }
-      return d;
-    } catch {
-      return new Date();
-    }
-  };
-
   const metrics = useMemo(() => {
+    const today = new Date();
     const totalOrders = tasks.length;
-    const todayTasks = tasks.filter(t => isSameDay(getSafeDate(t.startTime), new Date()));
+    const todayTasks = tasks.filter(t => isTaskOnDate(t, today));
     const todayCount = todayTasks.length;
     const todayVolume = todayTasks.reduce((sum, t) => sum + (t.plannedQuantity || 0), 0);
 
@@ -117,7 +106,8 @@ export default function App() {
       );
     }
     if (filterToday) {
-      filtered = filtered.filter(t => isSameDay(getSafeDate(t.startTime), new Date()));
+      const today = new Date();
+      filtered = filtered.filter(t => isTaskOnDate(t, today));
     }
     return filtered;
   }, [tasks, searchQuery, filterToday]);
