@@ -44,9 +44,9 @@ assert.equal(getProcessStageTheme('模压').accentClass, 'bg-amber-500');
 assert.equal(getProcessStageTheme('分切').accentClass, 'bg-emerald-500');
 assert.equal(getProcessStageTheme('未知工艺').accentClass, 'bg-blue-500');
 
-assert.equal(getProcessCardGridColumns('sm'), 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4');
-assert.equal(getProcessCardGridColumns('md'), 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3');
-assert.equal(getProcessCardGridColumns('lg'), 'grid-cols-1 lg:grid-cols-2');
+assert.equal(getProcessCardGridColumns('sm'), 'grid-cols-[repeat(auto-fill,minmax(260px,1fr))]');
+assert.equal(getProcessCardGridColumns('md'), 'grid-cols-[repeat(auto-fill,minmax(320px,1fr))]');
+assert.equal(getProcessCardGridColumns('lg'), 'grid-cols-[repeat(auto-fill,minmax(400px,1fr))]');
 
 const grouped = groupProcessTasks([
   { id: 'A', process: '涂布' },

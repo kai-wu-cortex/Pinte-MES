@@ -30,9 +30,9 @@ type ProcessField = {
 };
 
 const PROCESS_CARD_GRID_COLUMNS: Record<CardSize, string> = {
-  sm: 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4',
-  md: 'grid-cols-1 md:grid-cols-2 xl:grid-cols-3',
-  lg: 'grid-cols-1 lg:grid-cols-2',
+  sm: 'grid-cols-[repeat(auto-fill,minmax(260px,1fr))]',
+  md: 'grid-cols-[repeat(auto-fill,minmax(320px,1fr))]',
+  lg: 'grid-cols-[repeat(auto-fill,minmax(400px,1fr))]',
 };
 
 const PROCESS_CARD_DEFAULT_FIELDS = ['id', 'process', 'productName', 'plannedQuantity', 'specification', 'machineName', 'startTime', 'notes'];
@@ -642,7 +642,7 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
                 </h3>
               )}
               {displayMode === 'grid' ? (
-                <div className={cn('grid gap-3 content-start', getProcessCardGridColumns(cardSize))}>
+                <div key={`grid-${cardSize}`} className={cn('grid gap-3 content-start', getProcessCardGridColumns(cardSize))}>
                   {groupTasks.map(task => (
                     <ProcessGridCard
                       key={task.id}
@@ -656,7 +656,7 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
                   ))}
                 </div>
               ) : (
-                <div className="flex flex-col gap-2">
+                <div key="list" className="flex flex-col gap-2">
                   {groupTasks.map(task => (
                     <ProcessRow
                       key={task.id}

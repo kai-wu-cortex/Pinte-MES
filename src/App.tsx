@@ -10,7 +10,7 @@ import { Task, CustomFieldConfig } from './types';
 import { DEFAULT_FIELD_CONFIG } from './data';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { getNextDailySyncDelayMs } from './syncSchedule';
-import { isTaskOnDate } from './dateFilters';
+import { filterTasksByToday, isTaskOnDate } from './dateFilters';
 
 // Lazy load heavy components that are not always visible
 const TableView = React.lazy(() => import('./components/TableView').then(m => ({ default: m.TableView })));
@@ -105,12 +105,11 @@ export default function App() {
         t.process.toLowerCase().includes(q)
       );
     }
-    if (filterToday) {
-      const today = new Date();
-      filtered = filtered.filter(t => isTaskOnDate(t, today));
-    }
-    return filtered;
+    return filterTasksByToday(filtered, filterToday);
   }, [tasks, searchQuery, filterToday]);
+
+  const showAllTasks = () => setFilterToday(false);
+  const showTodayTasks = () => setFilterToday(true);
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
@@ -403,7 +402,7 @@ export default function App() {
             title="所有生产单"
             value={metrics.totalOrders}
             icon={<LayoutDashboard className="w-5 h-5" />}
-            onClick={() => setFilterToday(false)}
+            onClick={showAllTasks}
             active={!filterToday}
           />
           <MetricCard
@@ -411,7 +410,7 @@ export default function App() {
             value={metrics.todayCount}
             icon={<Activity className="w-5 h-5" />}
             className="border-blue-500/30"
-            onClick={() => setFilterToday(true)}
+            onClick={showTodayTasks}
             active={filterToday}
           />
           <MetricCard
@@ -419,7 +418,7 @@ export default function App() {
             value={`${metrics.todayVolume} m`}
             icon={<CheckCircle2 className="w-5 h-5" />}
             className="border-emerald-500/30"
-            onClick={() => setFilterToday(true)}
+            onClick={showTodayTasks}
             active={filterToday}
           />
         </div>
@@ -438,7 +437,7 @@ export default function App() {
                 {viewMode === 'table' && <TableView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
                 {viewMode === 'calendar' && <CalendarView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
                 {viewMode === 'task' && <TaskView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
-                {viewMode === 'processCard' && <ProcessCardView tasks={filteredTasks} totalTaskCount={tasks.length} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
+                {viewMode === 'processCard' && <ProcessCardView key={filterToday ? 'today' : 'all'} tasks={filteredTasks} totalTaskCount={tasks.length} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
               </Suspense>
             </motion.div>
           </AnimatePresence>

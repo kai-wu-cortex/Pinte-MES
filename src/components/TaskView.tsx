@@ -46,6 +46,14 @@ interface TaskCardProps {
   taskFields: TaskField[];
 }
 
+export function formatTaskPlanDate(startTime: string): string {
+  try {
+    return format(new Date(startTime), 'MM-dd HH:mm');
+  } catch {
+    return '';
+  }
+}
+
 const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onProcessCardClick, size, visibleFields, taskFields }) => {
   const sizeClasses = {
     sm: 'p-2 gap-1 text-[10px]',
@@ -71,20 +79,7 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onProcessCardClick, 
     if (fieldId === 'startTime') {
       return (
         <span className="break-words">
-          {(() => {
-            try {
-              return format(new Date(task.startTime), 'MM-dd HH:mm');
-            } catch {
-              return '';
-            }
-          })()}
-          {task.endTime && ` - ${(() => {
-            try {
-              return format(new Date(task.endTime), 'HH:mm');
-            } catch {
-              return '';
-            }
-          })()}`}
+          {formatTaskPlanDate(task.startTime)}
         </span>
       );
     }
