@@ -1,6 +1,7 @@
 export type WpsEnv = {
   VITE_WPS_APP_ID?: string;
   VITE_WPS_APP_KEY?: string;
+  VITE_WPS_SPREADSHEET_ID?: string;
 };
 
 export const loadWpsConfig = (env: WpsEnv) => {
@@ -8,7 +9,7 @@ export const loadWpsConfig = (env: WpsEnv) => {
     apiUrl: 'https://openapi.wps.cn',
     appId: env.VITE_WPS_APP_ID ?? '',
     appKey: env.VITE_WPS_APP_KEY ?? '',
-    fileId: '',
+    fileId: env.VITE_WPS_SPREADSHEET_ID ?? '',
     worksheetId: 1,
     rowFrom: 0,
     rowTo: 9999,

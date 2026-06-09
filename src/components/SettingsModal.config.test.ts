@@ -27,14 +27,37 @@ function setLocalStorage(items: StorageMap = {}) {
 
 try {
   setLocalStorage();
-  assert.equal(loadWpsConfig({ VITE_WPS_APP_ID: 'env-app-id', VITE_WPS_APP_KEY: 'env-app-key' }).appId, 'env-app-id');
-  assert.equal(loadWpsConfig({ VITE_WPS_APP_ID: 'env-app-id', VITE_WPS_APP_KEY: 'env-app-key' }).appKey, 'env-app-key');
+  assert.deepEqual(
+    loadWpsConfig({
+      VITE_WPS_APP_ID: 'env-app-id',
+      VITE_WPS_APP_KEY: 'env-app-key',
+      VITE_WPS_SPREADSHEET_ID: 'env-file-id',
+    }),
+    {
+      apiUrl: 'https://openapi.wps.cn',
+      appId: 'env-app-id',
+      appKey: 'env-app-key',
+      fileId: 'env-file-id',
+      worksheetId: 1,
+      rowFrom: 0,
+      rowTo: 9999,
+      colFrom: 0,
+      colTo: 30,
+      code: '',
+    },
+  );
 
   setLocalStorage({
-    wps_config: JSON.stringify({ appId: 'saved-app-id', appKey: 'saved-app-key' }),
+    wps_config: JSON.stringify({ appId: 'saved-app-id', appKey: 'saved-app-key', fileId: 'saved-file-id' }),
   });
-  assert.equal(loadWpsConfig({ VITE_WPS_APP_ID: 'env-app-id', VITE_WPS_APP_KEY: 'env-app-key' }).appId, 'saved-app-id');
-  assert.equal(loadWpsConfig({ VITE_WPS_APP_ID: 'env-app-id', VITE_WPS_APP_KEY: 'env-app-key' }).appKey, 'saved-app-key');
+  const savedConfig = loadWpsConfig({
+    VITE_WPS_APP_ID: 'env-app-id',
+    VITE_WPS_APP_KEY: 'env-app-key',
+    VITE_WPS_SPREADSHEET_ID: 'env-file-id',
+  });
+  assert.equal(savedConfig.appId, 'saved-app-id');
+  assert.equal(savedConfig.appKey, 'saved-app-key');
+  assert.equal(savedConfig.fileId, 'saved-file-id');
 } finally {
   globalThis.localStorage = originalLocalStorage;
 }
