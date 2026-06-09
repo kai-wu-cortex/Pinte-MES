@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense } fr
 import { MetricCard } from './components/MetricCard';
 import { INITIAL_TASKS, MACHINES } from './data';
 import { fetchTasksFromWps, getWpsAccessToken, getCellAttachments, cachedToken, syncTasksFromWps } from './services/wps';
-import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Search, Loader2, CheckCircle, XCircle } from 'lucide-react';
+import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Search, Loader2, CheckCircle, XCircle, Factory } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import { cn } from './components/MetricCard';
 import { AnimatePresence, motion } from 'motion/react';
@@ -15,11 +15,12 @@ import { getNextDailySyncDelayMs } from './syncSchedule';
 const TableView = React.lazy(() => import('./components/TableView').then(m => ({ default: m.TableView })));
 const CalendarView = React.lazy(() => import('./components/CalendarView').then(m => ({ default: m.CalendarView })));
 const TaskView = React.lazy(() => import('./components/TaskView').then(m => ({ default: m.TaskView })));
+const ProcessCardView = React.lazy(() => import('./components/ProcessCardView').then(m => ({ default: m.ProcessCardView })));
 const TaskDetailModal = React.lazy(() => import('./components/TaskDetailModal').then(m => ({ default: m.TaskDetailModal })));
 const SettingsModal = React.lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const ExcelPreviewModal = React.lazy(() => import('./components/ExcelPreviewModal').then(m => ({ default: m.ExcelPreviewModal })));
 
-type ViewMode = 'table' | 'calendar' | 'task';
+type ViewMode = 'table' | 'calendar' | 'task' | 'processCard';
 
 export default function App() {
   const [viewMode, setViewMode] = useLocalStorage<ViewMode>('mes_viewMode', 'calendar');
@@ -349,6 +350,16 @@ export default function App() {
               <KanbanSquare className="w-4 h-4" />
               任务视图
             </button>
+            <button
+              onClick={() => setViewMode('processCard')}
+              className={cn(
+                "flex items-center gap-2 px-3 py-1.5 rounded-md text-sm font-medium transition-all",
+                viewMode === 'processCard' ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
+              )}
+            >
+              <Factory className="w-4 h-4" />
+              流程卡号
+            </button>
           </div>
           
           <div className="text-sm font-mono text-blue-300 bg-blue-950/50 px-3 py-1.5 rounded-lg border border-blue-900/50 flex items-center gap-2">
@@ -437,6 +448,7 @@ export default function App() {
                 {viewMode === 'table' && <TableView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
                 {viewMode === 'calendar' && <CalendarView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
                 {viewMode === 'task' && <TaskView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
+                {viewMode === 'processCard' && <ProcessCardView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
               </Suspense>
             </motion.div>
           </AnimatePresence>
