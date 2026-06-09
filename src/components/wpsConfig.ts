@@ -21,9 +21,13 @@ export const loadWpsConfig = (env: WpsEnv) => {
   const saved = localStorage.getItem('wps_config');
   if (saved) {
     try {
+      const parsed = JSON.parse(saved);
       return {
         ...defaults,
-        ...JSON.parse(saved),
+        ...parsed,
+        appId: parsed.appId || defaults.appId,
+        appKey: parsed.appKey || defaults.appKey,
+        fileId: parsed.fileId || defaults.fileId,
       };
     } catch {
       return defaults;

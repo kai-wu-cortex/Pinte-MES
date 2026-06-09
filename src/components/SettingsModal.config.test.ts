@@ -58,6 +58,18 @@ try {
   assert.equal(savedConfig.appId, 'saved-app-id');
   assert.equal(savedConfig.appKey, 'saved-app-key');
   assert.equal(savedConfig.fileId, 'saved-file-id');
+
+  setLocalStorage({
+    wps_config: JSON.stringify({ appId: '', appKey: '', fileId: '' }),
+  });
+  const emptySavedConfig = loadWpsConfig({
+    VITE_WPS_APP_ID: 'env-app-id',
+    VITE_WPS_APP_KEY: 'env-app-key',
+    VITE_WPS_SPREADSHEET_ID: 'env-file-id',
+  });
+  assert.equal(emptySavedConfig.appId, 'env-app-id');
+  assert.equal(emptySavedConfig.appKey, 'env-app-key');
+  assert.equal(emptySavedConfig.fileId, 'env-file-id');
 } finally {
   globalThis.localStorage = originalLocalStorage;
 }
