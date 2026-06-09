@@ -107,6 +107,7 @@ export default function App() {
     }
     return filterTasksByToday(filtered, filterToday);
   }, [tasks, searchQuery, filterToday]);
+  const filteredViewKey = `${filterToday ? 'today' : 'all'}:${searchQuery}`;
 
   const showAllTasks = () => setFilterToday(false);
   const showTodayTasks = () => setFilterToday(true);
@@ -434,10 +435,10 @@ export default function App() {
               className="h-full"
             >
               <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-blue-400" /></div>}>
-                {viewMode === 'table' && <TableView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
-                {viewMode === 'calendar' && <CalendarView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
-                {viewMode === 'task' && <TaskView tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
-                {viewMode === 'processCard' && <ProcessCardView key={filterToday ? 'today' : 'all'} tasks={filteredTasks} totalTaskCount={tasks.length} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
+                {viewMode === 'table' && <TableView key={`table:${filteredViewKey}`} tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
+                {viewMode === 'calendar' && <CalendarView key={`calendar:${filteredViewKey}`} tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
+                {viewMode === 'task' && <TaskView key={`task:${filteredViewKey}`} tasks={filteredTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
+                {viewMode === 'processCard' && <ProcessCardView key={`process:${filteredViewKey}`} tasks={filteredTasks} totalTaskCount={tasks.length} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
               </Suspense>
             </motion.div>
           </AnimatePresence>

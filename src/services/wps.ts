@@ -360,7 +360,6 @@ export async function fetchTasksFromWps(
  * 11: notes (备注)
  *
  * Missing columns get default values:
- * endTime: empty (defaults to current date if needed)
  * operator: empty string
  */
 /**
@@ -446,15 +445,6 @@ function convertWpsRowToTask(
       task[field] = '';
     }
   });
-
-  // endTime defaults to empty string converted to current date
-  if (!task.endTime) {
-    task.endTime = '';
-    // Still need valid ISO for Date constructor
-    if (!task.endTime) {
-      task.endTime = new Date().toISOString();
-    }
-  }
 
   // fileUrl is special - it's the attachment cell for electronic process card
   // Look for field that might contain it - usually "电子流程卡"

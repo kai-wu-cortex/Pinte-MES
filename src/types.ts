@@ -18,7 +18,7 @@ export interface Task {
   slittingQuantity: number; // 分切数量
   shippedQuantity: number; // 实际出货数量
   startTime: string; // ISO string
-  endTime: string; // ISO string
+  endTime?: string;
   operator: string;
   notes: string;
   fileUrl?: string; // File URL or cell text

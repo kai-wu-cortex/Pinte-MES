@@ -111,20 +111,6 @@ export function TaskDetailModal({ task, onClose }: TaskDetailModalProps) {
                       })()}
                     </span>
                   </div>
-                  {task.endTime && (
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs text-slate-400">结束时间</span>
-                      <span className="text-sm text-slate-200">
-                        {(() => {
-                          try {
-                            return format(new Date(task.endTime), 'yyyy-MM-dd HH:mm');
-                          } catch {
-                            return task.endTime;
-                          }
-                        })()}
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
             </div>

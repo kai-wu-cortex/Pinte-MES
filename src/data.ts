@@ -1,4 +1,4 @@
-import { addDays, addHours, setHours, startOfToday } from 'date-fns';
+import { addDays, setHours, startOfToday } from 'date-fns';
 import { Machine, Task } from './types';
 
 const today = startOfToday();
@@ -26,10 +26,7 @@ export const INITIAL_TASKS: Task[] = Array.from({ length: 100 }).map((_, i) => {
 
   const machineTaskIndex = Math.floor(i / MACHINES.length);
   const startHour = (machineTaskIndex * 3) % 24;
-  const duration = 2 + (i % 3);
-
   const startTime = setHours(baseDate, startHour);
-  const endTime = addHours(startTime, duration);
 
   const plannedQuantity = 5000 + (i * 100) % 10000;
 
@@ -45,7 +42,6 @@ export const INITIAL_TASKS: Task[] = Array.from({ length: 100 }).map((_, i) => {
     slittingQuantity: Math.floor(plannedQuantity * 0.8), // 分切数量
     shippedQuantity: 0, // 实际出货数量
     startTime: startTime.toISOString(),
-    endTime: endTime.toISOString(),
     operator,
     notes: note,
     fileUrl: 'https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUqptlbsY4OgvB2Q5Ayo/edit?usp=sharing',

@@ -418,7 +418,7 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick }: Calenda
                           }
 
                           // Special handling for date fields
-                          if (field.id === 'startTime' || field.id === 'endTime') {
+                          if (field.id === 'startTime') {
                             try {
                               const dateValue = new Date(value as string);
                               return (
