@@ -33,3 +33,10 @@ export interface Machine {
   name: string;
   type: string;
 }
+
+export type SortDirection = 'asc' | 'desc';
+
+export interface SortConfig {
+  fieldId: string;
+  direction: SortDirection;
+}

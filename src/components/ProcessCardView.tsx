@@ -478,9 +478,7 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
 
   const visibleFields = useMemo<Set<string>>(() => new Set(visibleFieldsArr.filter(id => fieldConfigVisibleIds.has(id))), [visibleFieldsArr, fieldConfigVisibleIds]);
   const filteredProcessTasks = useMemo(() => getFilteredProcessTasks(tasks, filterQuery, filters), [tasks, filterQuery, filters]);
-  const sortedTasks = useMemo(() => {
-    return [...filteredProcessTasks].sort((a, b) => a.id.localeCompare(b.id));
-  }, [filteredProcessTasks]);
+  const sortedTasks = filteredProcessTasks;
   const flowStages = useMemo(() => resolveProcessFlowStages(flowOrder, sortedTasks), [flowOrder, sortedTasks]);
   const moveFlowStage = (stageId: string, direction: -1 | 1) => {
     const currentOrder = flowStages.map(stage => stage.id);

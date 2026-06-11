@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
-import { Task, CustomFieldConfig } from '../types';
+import { Task, CustomFieldConfig, SortConfig } from '../types';
 import { DEFAULT_FIELD_CONFIG } from '../data';
 import { cn } from './MetricCard';
-import { Columns, Rows, Check, ListTree, ChevronDown, ChevronRight, GripVertical, FilterX, ChevronLeft, ChevronRight as ChevronRightIcon } from 'lucide-react';
+import { Columns, Rows, Check, ListTree, ChevronDown, ChevronRight, GripVertical, FilterX, ChevronLeft, ChevronRight as ChevronRightIcon, ArrowDownAZ, ArrowUpAZ } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, horizontalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
@@ -52,6 +52,8 @@ const OPERATOR_LABELS: Record<FilterOperator, string> = {
 
 interface TableViewProps {
   tasks: Task[];
+  sortConfig: SortConfig;
+  onSortChange: (sortConfig: SortConfig) => void;
   onTaskClick: (task: Task) => void;
   onProcessCardClick: (task: Task) => void;
 }
@@ -87,7 +89,7 @@ function getDefaultWidth(fieldId: string): number {
   return widthMap[fieldId] || 150;
 }
 
-export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewProps) {
+export function TableView({ tasks, sortConfig, onSortChange, onTaskClick, onProcessCardClick }: TableViewProps) {
   const [fieldConfig, setFieldConfig] = useLocalStorage<CustomFieldConfig[]>('mes_field_mapping_config', DEFAULT_FIELD_CONFIG);
   const [spacing, setSpacing] = useLocalStorage<Spacing>('mes_table_spacing', 'compact');
 
@@ -548,7 +550,7 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
               <thead className="text-xs text-blue-300 uppercase bg-slate-800/80 sticky top-0 z-10 shadow-sm">
                 <tr>
                   {orderedColumns.map(col => visibleCols.has(col.id) && (
-                    <SortableHeader key={col.id} col={col} spacing={spacing} colWidths={colWidths} handleResizeStart={handleResizeStart} filters={filters} setFilters={setFilters} />
+                    <SortableHeader key={col.id} col={col} spacing={spacing} colWidths={colWidths} handleResizeStart={handleResizeStart} filters={filters} setFilters={setFilters} sortConfig={sortConfig} onSortChange={onSortChange} />
                   ))}
                 </tr>
               </thead>
@@ -702,7 +704,7 @@ function SortableMenuItem({ col, visibleCols, toggleCol }: any) {
   );
 }
 
-function SortableHeader({ col, spacing, colWidths, handleResizeStart, filters, setFilters }: any) {
+function SortableHeader({ col, spacing, colWidths, handleResizeStart, filters, setFilters, sortConfig, onSortChange }: any) {
   const { attributes, listeners, setNodeRef, transform, transition } = useSortable({ id: col.id });
   const [showOperatorMenu, setShowOperatorMenu] = useState(false);
   const style = {
@@ -739,6 +741,15 @@ function SortableHeader({ col, spacing, colWidths, handleResizeStart, filters, s
   };
 
   const hasActiveFilter = !!currentConfig;
+  const isSorted = sortConfig?.fieldId === col.id;
+
+  const handleSortClick = () => {
+    if (!onSortChange) return;
+    onSortChange({
+      fieldId: col.id,
+      direction: isSorted && sortConfig.direction === 'asc' ? 'desc' : 'asc',
+    });
+  };
 
   return (
     <th
@@ -779,7 +790,21 @@ function SortableHeader({ col, spacing, colWidths, handleResizeStart, filters, s
           >
             {OPERATOR_LABELS[currentOperator]}
           </button>
-          <div className="truncate flex-1 font-medium">{col.label}</div>
+          <button
+            onClick={handleSortClick}
+            className={cn(
+              "truncate flex-1 font-medium text-left flex items-center gap-1 min-w-0 hover:text-white transition-colors",
+              isSorted ? "text-cyan-200" : "text-blue-300"
+            )}
+            title={`按${col.label}排序`}
+          >
+            <span className="truncate">{col.label}</span>
+            {isSorted && (
+              sortConfig.direction === 'asc'
+                ? <ArrowUpAZ className="w-3 h-3 shrink-0 text-cyan-300" />
+                : <ArrowDownAZ className="w-3 h-3 shrink-0 text-cyan-300" />
+            )}
+          </button>
         </div>
         <div className="relative">
           {!['isEmpty', 'isNotEmpty'].includes(currentOperator) && (
