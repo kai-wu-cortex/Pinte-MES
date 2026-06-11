@@ -88,3 +88,6 @@ assert.deepEqual(getFilteredProcessTasks(filterTasks, '').map((task: any) => tas
 assert.deepEqual(getFilteredProcessTasks(filterTasks, '亮金').map((task: any) => task.id), ['FC-001']);
 assert.deepEqual(getFilteredProcessTasks(filterTasks, 'B2').map((task: any) => task.id), ['FC-002']);
 assert.deepEqual(getFilteredProcessTasks(filterTasks, '2026-06-10').map((task: any) => task.id), ['FC-001']);
+assert.deepEqual(getFilteredProcessTasks(filterTasks, '', { process: { operator: 'equals', value: '涂布' } }).map((task: any) => task.id), ['FC-001']);
+assert.deepEqual(getFilteredProcessTasks(filterTasks, '', { notes: { operator: 'isEmpty', value: '' } }).map((task: any) => task.id), ['FC-002']);
+assert.deepEqual(getFilteredProcessTasks(filterTasks, '', { productName: { operator: 'notContains', value: '亮' } }).map((task: any) => task.id), ['FC-002']);

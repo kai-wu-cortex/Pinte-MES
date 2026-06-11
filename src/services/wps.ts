@@ -1,5 +1,6 @@
 import { Task, CustomFieldConfig } from '../types';
 import { DEFAULT_FIELD_CONFIG, MACHINES } from '../data';
+import { convertWpsDateValue } from '../wpsDateConvert';
 
 /**
  * Extract header names from raw WPS response
@@ -392,18 +393,11 @@ function convertWpsRowToTask(
     return Number(val) || 0;
   };
 
-  // Convert to ISO date if field ID contains Date or Time
+  // Convert to ISO date if field ID contains Date or Time.
+  // Returns '' for blank/unparseable values rather than falling back to today's date —
+  // a fallback would silently rewrite 2025 records to today and corrupt today-filtering.
   const getDateValue = (config: CustomFieldConfig): string => {
-    const val = getValue(config);
-    const trimmed = (val || '').trim();
-    if (!trimmed) {
-      return new Date().toISOString();
-    }
-    const date = new Date(trimmed);
-    if (isNaN(date.getTime())) {
-      return new Date().toISOString();
-    }
-    return date.toISOString();
+    return convertWpsDateValue(getValue(config));
   };
 
   // Start with all custom fields

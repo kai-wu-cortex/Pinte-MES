@@ -106,43 +106,36 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
   // Initialize column order and visible columns from field config
   const [columnOrder, setColumnOrder] = useLocalStorage<string[]>('mes_table_columnOrder', COLUMNS.map(c => c.id));
 
-  // Automatically add any new visible fields from fieldConfig that are not already in columnOrder
-  useMemo(() => {
-    const allColumnIds = COLUMNS.map(c => c.id);
-    const hasNewColumns = allColumnIds.some((id: string) => !columnOrder.includes(id));
-    if (hasNewColumns) {
-      // Add any missing columns to the end of the order
-      const newOrder = [...columnOrder];
-      allColumnIds.forEach((id: string) => {
-        if (!newOrder.includes(id)) {
-          newOrder.push(id);
-        }
-      });
-      setColumnOrder(newOrder);
-    }
-  }, [COLUMNS, columnOrder, setColumnOrder]);
-
   // Initialize visible columns and intersect with fields marked as visible in fieldConfig
   // This ensures only fields marked visible in fieldConfig can be shown in the table
-  const fieldConfigVisibleIds = useMemo(() => {
+  const fieldConfigVisibleIds = useMemo<Set<string>>(() => {
     return new Set(fieldConfig.filter(f => f.visible).map(f => f.fieldId));
   }, [fieldConfig]);
 
   const [visibleColsArr, setVisibleColsArr] = useLocalStorage<string[]>('mes_table_visibleCols', COLUMNS.map(c => c.id));
 
-  // Automatically add any new visible fields from fieldConfig that are not already in visibleColsArr
-  useMemo(() => {
+  // Track column IDs we've already seen so we only auto-add genuinely new columns.
+  // Using useMemo to set state caused user-hidden columns to be re-added on every render,
+  // making "列显示" toggle appear broken.
+  const knownColumnsRef = useRef<Set<string>>(new Set(columnOrder));
+  useEffect(() => {
+    const allColumnIds = COLUMNS.map(c => c.id);
+    const trulyNew = allColumnIds.filter(id => !knownColumnsRef.current.has(id));
+    if (trulyNew.length > 0) {
+      trulyNew.forEach(id => knownColumnsRef.current.add(id));
+      setColumnOrder([...columnOrder, ...trulyNew]);
+    }
+  }, [COLUMNS, columnOrder, setColumnOrder]);
+
+  // Same pattern for visible column toggles
+  const knownVisibleColsRef = useRef<Set<string>>(new Set(visibleColsArr));
+  useEffect(() => {
     const allVisibleIds: string[] = Array.from(fieldConfigVisibleIds);
-    const hasNewFields = allVisibleIds.some((id: string) => !visibleColsArr.includes(id));
-    if (hasNewFields) {
-      // Add any missing fields to visibleColsArr (new fields should be visible by default)
-      const newVisible = [...visibleColsArr];
-      allVisibleIds.forEach((id: string) => {
-        if (!newVisible.includes(id)) {
-          newVisible.push(id);
-        }
-      });
-      setVisibleColsArr(newVisible);
+    const trulyNew: string[] = allVisibleIds.filter(id => !knownVisibleColsRef.current.has(id));
+    if (trulyNew.length > 0) {
+      trulyNew.forEach(id => knownVisibleColsRef.current.add(id));
+      const next: string[] = [...visibleColsArr, ...trulyNew];
+      setVisibleColsArr(next);
     }
   }, [fieldConfigVisibleIds, visibleColsArr, setVisibleColsArr]);
 
@@ -342,10 +335,10 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
     });
   }, [tasks, filters]);
 
-  // Reset page when filters change
+  // Reset page when filtered data changes
   useEffect(() => {
     setCurrentPage(1);
-  }, [filters]);
+  }, [filters, tasks]);
 
   // Reset page when page size changes
   useEffect(() => {
@@ -595,8 +588,11 @@ export function TableView({ tasks, onTaskClick, onProcessCardClick }: TableViewP
                             >
                               {col.id === 'startTime'
                                 ? (() => {
+                                    if (!task.startTime) return '';
+                                    const d = new Date(task.startTime);
+                                    if (isNaN(d.getTime())) return '';
                                     try {
-                                      return format(new Date(task.startTime), 'yyyy-MM-dd');
+                                      return format(d, 'yyyy-MM-dd');
                                     } catch {
                                       return '';
                                     }

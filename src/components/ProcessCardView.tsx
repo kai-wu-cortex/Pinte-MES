@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { AlertTriangle, Check, ChevronsRight, Circle, CircleDot, Factory, Grid2X2, Layers, LayoutGrid, List, ListTree, Palette, Search, Settings2 } from 'lucide-react';
+import { AlertTriangle, Check, ChevronsRight, Circle, CircleDot, Factory, FilterX, Grid2X2, Layers, LayoutGrid, List, ListTree, Palette, Search, Settings2 } from 'lucide-react';
 import { Task, CustomFieldConfig } from '../types';
 import { DEFAULT_FIELD_CONFIG } from '../data';
 import { useLocalStorage } from '../hooks/useLocalStorage';
@@ -28,6 +28,47 @@ type ProcessField = {
   id: string;
   label: string;
 };
+
+type FilterOperator = 'contains' | 'notContains' | 'equals' | 'notEquals' | 'startsWith' | 'endsWith' | 'isEmpty' | 'isNotEmpty';
+
+interface FilterConfig {
+  operator: FilterOperator;
+  value: string;
+}
+
+const OPERATOR_LABELS: Record<FilterOperator, string> = {
+  contains: '包含',
+  notContains: '不包含',
+  equals: '等于',
+  notEquals: '不等于',
+  startsWith: '开头是',
+  endsWith: '结尾是',
+  isEmpty: '为空',
+  isNotEmpty: '不为空',
+};
+
+function matchesFilter(value: string, operator: FilterOperator, filterValue: string): boolean {
+  const v = value.toLowerCase();
+  const f = filterValue.toLowerCase();
+  switch (operator) {
+    case 'contains':
+      return v.includes(f);
+    case 'notContains':
+      return !v.includes(f);
+    case 'equals':
+      return v === f;
+    case 'notEquals':
+      return v !== f;
+    case 'startsWith':
+      return v.startsWith(f);
+    case 'endsWith':
+      return v.endsWith(f);
+    case 'isEmpty':
+      return v === '';
+    case 'isNotEmpty':
+      return v !== '';
+  }
+}
 
 const PROCESS_CARD_GRID_COLUMNS: Record<CardSize, string> = {
   sm: 'grid-cols-[repeat(auto-fill,minmax(260px,1fr))]',
@@ -128,20 +169,34 @@ export function getVisibleProcessTasks(tasks: Task[], visibleLimit: number): Tas
   return tasks.slice(0, visibleLimit);
 }
 
-export function getFilteredProcessTasks(tasks: Task[], query: string): Task[] {
+export function getFilteredProcessTasks(tasks: Task[], query: string, filters: Record<string, FilterConfig> = {}): Task[] {
   const normalizedQuery = query.trim().toLowerCase();
-  if (!normalizedQuery) return tasks;
+  const filterEntries = Object.entries(filters).filter(([_, config]) => {
+    return config.operator === 'isEmpty' || config.operator === 'isNotEmpty' || config.value.trim() !== '';
+  });
 
-  return tasks.filter(task => [
-    task.id,
-    task.process,
-    task.productName,
-    task.machineName,
-    task.specification,
-    task.operator,
-    task.notes,
-    formatDate(task.startTime),
-  ].some(value => String(value || '').toLowerCase().includes(normalizedQuery)));
+  return tasks.filter(task => {
+    const matchesQuery = !normalizedQuery || [
+      task.id,
+      task.process,
+      task.productName,
+      task.machineName,
+      task.specification,
+      task.operator,
+      task.notes,
+      formatDate(task.startTime),
+    ].some(value => String(value || '').toLowerCase().includes(normalizedQuery));
+
+    if (!matchesQuery) return false;
+
+    return filterEntries.every(([fieldId, config]) => {
+      const { operator, value } = config;
+      const cellValue = fieldId === 'startTime'
+        ? formatDate(task.startTime)
+        : String(task[fieldId as keyof Task] || '');
+      return matchesFilter(cellValue, operator, value);
+    });
+  });
 }
 
 function formatDate(value: string): string {
@@ -397,7 +452,9 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
   const [showSizeMenu, setShowSizeMenu] = useState(false);
   const [showGroupMenu, setShowGroupMenu] = useState(false);
   const [showFlowMenu, setShowFlowMenu] = useState(false);
+  const [showFilterMenu, setShowFilterMenu] = useState(false);
   const [filterQuery, setFilterQuery] = useState('');
+  const [filters, setFilters] = useLocalStorage<Record<string, FilterConfig>>('mes_process_filters', {});
   const [visibleLimit, setVisibleLimit] = useState(PROCESS_CARD_PAGE_SIZE);
   const processFields = useMemo<ProcessField[]>(() => {
     return fieldConfig
@@ -417,10 +474,10 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
 
   useEffect(() => {
     setVisibleLimit(PROCESS_CARD_PAGE_SIZE);
-  }, [tasks, groupBy, displayMode, filterQuery]);
+  }, [tasks, groupBy, displayMode, filterQuery, filters]);
 
   const visibleFields = useMemo<Set<string>>(() => new Set(visibleFieldsArr.filter(id => fieldConfigVisibleIds.has(id))), [visibleFieldsArr, fieldConfigVisibleIds]);
-  const filteredProcessTasks = useMemo(() => getFilteredProcessTasks(tasks, filterQuery), [tasks, filterQuery]);
+  const filteredProcessTasks = useMemo(() => getFilteredProcessTasks(tasks, filterQuery, filters), [tasks, filterQuery, filters]);
   const sortedTasks = useMemo(() => {
     return [...filteredProcessTasks].sort((a, b) => a.id.localeCompare(b.id));
   }, [filteredProcessTasks]);
@@ -436,6 +493,12 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
   };
   const visibleTasks = useMemo(() => getVisibleProcessTasks(sortedTasks, visibleLimit), [sortedTasks, visibleLimit]);
   const groupedTasks = useMemo(() => groupProcessTasks(visibleTasks, groupBy), [visibleTasks, groupBy]);
+  const clearFilter = (fieldId: string) => {
+    const nextFilters = { ...filters };
+    delete nextFilters[fieldId];
+    setFilters(nextFilters);
+  };
+
   const toggleField = (id: string) => {
     if (!fieldConfigVisibleIds.has(id)) return;
     const next = new Set<string>(visibleFields);
@@ -466,13 +529,90 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
               type="text"
               value={filterQuery}
               onChange={(event) => setFilterQuery(event.target.value)}
-              placeholder="筛选流程卡..."
-              className="w-44 bg-slate-950 border border-slate-700 rounded-md py-1 pl-8 pr-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
+              placeholder="全局搜索..."
+              className="w-40 bg-slate-950 border border-slate-700 rounded-md py-1 pl-8 pr-2 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400"
             />
           </div>
           <div className="relative">
             <button
-              onClick={() => { setShowGroupMenu(!showGroupMenu); setShowSizeMenu(false); setShowFieldMenu(false); setShowFlowMenu(false); }}
+              onClick={() => { setShowFilterMenu(!showFilterMenu); setShowGroupMenu(false); setShowSizeMenu(false); setShowFieldMenu(false); setShowFlowMenu(false); }}
+              className={cn(
+                'bg-slate-950 hover:bg-slate-800 text-slate-200 px-3 py-1 rounded-md font-mono text-xs transition-colors border flex items-center gap-1',
+                Object.keys(filters).length > 0 ? 'border-cyan-400/60 text-cyan-100' : 'border-slate-700'
+              )}
+            >
+              <Settings2 className="w-3 h-3" /> 筛选
+              {Object.keys(filters).length > 0 && (
+                <span className="bg-cyan-500 text-slate-950 text-[10px] px-1 py-0.5 rounded-full">
+                  {Object.keys(filters).length}
+                </span>
+              )}
+            </button>
+            {showFilterMenu && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowFilterMenu(false)} />
+                <div className="absolute right-0 top-full mt-1 z-50 w-72 bg-slate-800 border border-blue-900/50 rounded-lg shadow-xl py-2 overflow-hidden max-h-80 overflow-y-auto">
+                  {processFields.map(field => {
+                    const currentConfig = filters[field.id];
+                    const currentValue = currentConfig?.value || '';
+                    const currentOperator = currentConfig?.operator || 'contains';
+                    return (
+                      <div key={field.id} className="px-3 py-2 border-b border-slate-700/50 last:border-b-0">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="text-[10px] font-medium text-slate-300">{field.label}</span>
+                          {currentConfig && (
+                            <button onClick={() => clearFilter(field.id)} className="text-slate-400 hover:text-white">
+                              <FilterX className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="flex gap-1.5">
+                          <select
+                            value={currentOperator}
+                            onChange={(event) => {
+                              const operator = event.target.value as FilterOperator;
+                              if (!currentValue && !['isEmpty', 'isNotEmpty'].includes(operator)) {
+                                clearFilter(field.id);
+                              } else {
+                                setFilters({ ...filters, [field.id]: { operator, value: currentValue } });
+                              }
+                            }}
+                            className="w-24 bg-slate-900 border border-slate-700 rounded px-1.5 py-1 text-[10px] text-slate-200 focus:outline-none focus:border-cyan-400"
+                          >
+                            {(Object.entries(OPERATOR_LABELS) as [FilterOperator, string][]).map(([operator, label]) => (
+                              <option key={operator} value={operator}>{label}</option>
+                            ))}
+                          </select>
+                          {!['isEmpty', 'isNotEmpty'].includes(currentOperator) && (
+                            <input
+                              type="text"
+                              value={currentValue}
+                              onChange={(event) => {
+                                const value = event.target.value;
+                                if (value) {
+                                  setFilters({ ...filters, [field.id]: { operator: currentOperator, value } });
+                                } else {
+                                  clearFilter(field.id);
+                                }
+                              }}
+                              placeholder={`筛选${field.label}...`}
+                              className={cn(
+                                'flex-1 min-w-0 bg-slate-900 border rounded px-2 py-1 text-xs text-slate-200 placeholder:text-slate-500 focus:outline-none focus:border-cyan-400',
+                                currentConfig ? 'border-cyan-400' : 'border-slate-700'
+                              )}
+                            />
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
+          </div>
+          <div className="relative">
+            <button
+              onClick={() => { setShowGroupMenu(!showGroupMenu); setShowSizeMenu(false); setShowFieldMenu(false); setShowFlowMenu(false); setShowFilterMenu(false); }}
               className="bg-slate-950 hover:bg-slate-800 text-slate-200 px-3 py-1 rounded-md font-mono text-xs transition-colors border border-slate-700 flex items-center gap-1"
             >
               <ListTree className="w-3 h-3" /> 分组: {groupBy === 'none' ? '无' : processFields.find(field => field.id === groupBy)?.label || groupBy}
@@ -504,7 +644,7 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
           </div>
           <div className="relative">
             <button
-              onClick={() => { setShowFlowMenu(!showFlowMenu); setShowGroupMenu(false); setShowSizeMenu(false); setShowFieldMenu(false); }}
+              onClick={() => { setShowFlowMenu(!showFlowMenu); setShowGroupMenu(false); setShowSizeMenu(false); setShowFieldMenu(false); setShowFilterMenu(false); }}
               className="bg-slate-950 hover:bg-slate-800 text-slate-200 px-3 py-1 rounded-md font-mono text-xs transition-colors border border-slate-700 flex items-center gap-1"
             >
               <ChevronsRight className="w-3 h-3" /> 流转顺序: {flowStages.map(stage => stage.label).join(' → ')}
@@ -548,7 +688,7 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
           </div>
           <div className="relative">
             <button
-              onClick={() => { setShowSizeMenu(!showSizeMenu); setShowGroupMenu(false); setShowFieldMenu(false); setShowFlowMenu(false); }}
+              onClick={() => { setShowSizeMenu(!showSizeMenu); setShowGroupMenu(false); setShowFieldMenu(false); setShowFlowMenu(false); setShowFilterMenu(false); }}
               className="bg-slate-950 hover:bg-slate-800 text-slate-200 px-3 py-1 rounded-md font-mono text-xs transition-colors border border-slate-700 flex items-center gap-1"
             >
               <LayoutGrid className="w-3 h-3" /> 卡片大小
@@ -577,7 +717,7 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
           </div>
           <div className="relative">
             <button
-              onClick={() => { setShowFieldMenu(!showFieldMenu); setShowGroupMenu(false); setShowSizeMenu(false); setShowFlowMenu(false); }}
+              onClick={() => { setShowFieldMenu(!showFieldMenu); setShowGroupMenu(false); setShowSizeMenu(false); setShowFlowMenu(false); setShowFilterMenu(false); }}
               className="bg-slate-950 hover:bg-slate-800 text-slate-200 px-3 py-1 rounded-md font-mono text-xs transition-colors border border-slate-700 flex items-center gap-1"
             >
               <Settings2 className="w-3 h-3" /> 显示设置

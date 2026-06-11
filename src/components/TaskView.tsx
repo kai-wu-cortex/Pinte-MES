@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Task, CustomFieldConfig } from '../types';
 import { DEFAULT_FIELD_CONFIG } from '../data';
 import { cn } from './MetricCard';
@@ -47,8 +47,11 @@ interface TaskCardProps {
 }
 
 export function formatTaskPlanDate(startTime: string): string {
+  if (!startTime) return '';
+  const d = new Date(startTime);
+  if (isNaN(d.getTime())) return '';
   try {
-    return format(new Date(startTime), 'MM-dd HH:mm');
+    return format(d, 'MM-dd HH:mm');
   } catch {
     return '';
   }
@@ -161,25 +164,23 @@ export function TaskView({ tasks, onTaskClick, onProcessCardClick }: TaskViewPro
 
   // Initialize visible fields and intersect with fields marked as visible in fieldConfig
   // This ensures only fields marked visible in fieldConfig can be shown in the task view
-  const fieldConfigVisibleIds = useMemo(() => {
+  const fieldConfigVisibleIds = useMemo<Set<string>>(() => {
     return new Set(fieldConfig.filter(f => f.visible).map(f => f.fieldId));
   }, [fieldConfig]);
 
   const [visibleFieldsArr, setVisibleFieldsArr] = useLocalStorage<string[]>('mes_task_visibleFields', (TASK_FIELDS.map(f => f.id) as unknown) as string[]);
 
-  // Automatically add any new visible fields from fieldConfig that are not already in visibleFieldsArr
-  useMemo(() => {
+  // Track field IDs we've already seen so we only auto-add genuinely new fields.
+  // Using useMemo to set state caused user-hidden fields to be re-added on every render,
+  // making "显示设置" toggle appear broken.
+  const knownFieldsRef = useRef<Set<string>>(new Set(visibleFieldsArr));
+  useEffect(() => {
     const allVisibleIds: string[] = Array.from(fieldConfigVisibleIds);
-    const hasNewFields = allVisibleIds.some((id: string) => !visibleFieldsArr.includes(id));
-    if (hasNewFields) {
-      // Add any missing fields to visibleFieldsArr (new fields should be visible by default)
-      const newVisible = [...visibleFieldsArr];
-      allVisibleIds.forEach((id: string) => {
-        if (!newVisible.includes(id)) {
-          newVisible.push(id);
-        }
-      });
-      setVisibleFieldsArr(newVisible);
+    const trulyNew: string[] = allVisibleIds.filter(id => !knownFieldsRef.current.has(id));
+    if (trulyNew.length > 0) {
+      trulyNew.forEach(id => knownFieldsRef.current.add(id));
+      const next: string[] = [...visibleFieldsArr, ...trulyNew];
+      setVisibleFieldsArr(next);
     }
   }, [fieldConfigVisibleIds, visibleFieldsArr, setVisibleFieldsArr]);
 

@@ -125,6 +125,14 @@ export default function App() {
   const syncRef = useRef({ tasks, setTasks, setSyncResponse, setIsSyncing, setToast });
   syncRef.current = { tasks, setTasks, setSyncResponse, setIsSyncing, setToast };
 
+  // Keep latest fieldConfig accessible from the stable sync callback without
+  // invalidating it. Without this, the useCallback below would close over the
+  // initial fieldConfig and ignore mappings saved later via SettingsModal.
+  const fieldConfigRef = useRef(fieldConfig);
+  useEffect(() => {
+    fieldConfigRef.current = fieldConfig;
+  }, [fieldConfig]);
+
   // Common sync logic from WPS (delegates to wps service)
   // useCallback with empty deps keeps function identity stable forever
   const handleSyncTasksFromWps = useCallback(async (config?: {
@@ -137,16 +145,21 @@ export default function App() {
     rowTo?: number;
     colFrom?: number;
     colTo?: number;
+    fieldConfig?: CustomFieldConfig[];
   }): Promise<void> => {
     const startTime = Date.now();
     const { tasks, setTasks, setSyncResponse, setIsSyncing, setToast } = syncRef.current;
     const prevTaskCount = tasks.length;
+    // Caller (SettingsModal "保存并同步") can pass the just-saved mapping so
+    // the first sync after a config change already uses it; otherwise fall
+    // back to the latest committed fieldConfig from the ref.
+    const effectiveFieldConfig = config?.fieldConfig ?? fieldConfigRef.current;
     console.log(`[WPS Sync] Starting sync... (prev: ${prevTaskCount} tasks)`);
     try {
       setIsSyncing(true);
       const { tasks: wpsTasks, rawData } = await syncTasksFromWps({
         ...config,
-        fieldConfig,
+        fieldConfig: effectiveFieldConfig,
       });
       const elapsed = Date.now() - startTime;
       setSyncResponse(JSON.stringify(rawData, null, 2));

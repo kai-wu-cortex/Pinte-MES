@@ -65,11 +65,32 @@ export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tok
     }
   }, [show, syncResponse]);
 
+  const validateFieldConfig = () => {
+    const ids = fieldConfig.map(f => f.fieldId);
+    if (new Set(ids).size !== ids.length) {
+      alert('字段 ID 不能重复，请检查');
+      return false;
+    }
+    return true;
+  };
+
+  const saveFieldConfig = () => {
+    localStorage.setItem('mes_field_mapping_config', JSON.stringify(fieldConfig));
+    onSaveFieldConfig?.(fieldConfig);
+  };
+
   const handleSync = async () => {
+    if (!window.confirm('是否保存当前字段映射配置并立即同步最新表格内容？')) {
+      return;
+    }
+    if (!validateFieldConfig()) {
+      return;
+    }
     setIsSyncing(true);
     setSyncStatus('idle');
     try {
-      await onSync(config);
+      saveFieldConfig();
+      await onSync({ ...config, fieldConfig });
       setSyncStatus('success');
       setTimeout(() => {
         onClose();
@@ -542,14 +563,8 @@ export function SettingsModal({ onClose, onSync, onGetToken, onRefreshToken, tok
                   </button>
                   <button
                     onClick={() => {
-                      // Check for duplicate field IDs
-                      const ids = fieldConfig.map(f => f.fieldId);
-                      if (new Set(ids).size !== ids.length) {
-                        alert('字段 ID 不能重复，请检查');
-                        return;
-                      }
-                      localStorage.setItem('mes_field_mapping_config', JSON.stringify(fieldConfig));
-                      onSaveFieldConfig?.(fieldConfig);
+                      if (!validateFieldConfig()) return;
+                      saveFieldConfig();
                       // Keep modal open for further adjustments
                     }}
                     className="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors"

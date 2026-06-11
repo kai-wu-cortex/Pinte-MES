@@ -103,8 +103,11 @@ export function TaskDetailModal({ task, onClose }: TaskDetailModalProps) {
                     <span className="text-xs text-slate-400">日期</span>
                     <span className="text-sm text-slate-200">
                       {(() => {
+                        if (!task.startTime) return '—';
+                        const d = new Date(task.startTime);
+                        if (isNaN(d.getTime())) return task.startTime;
                         try {
-                          return format(new Date(task.startTime), 'yyyy-MM-dd HH:mm');
+                          return format(d, 'yyyy-MM-dd HH:mm');
                         } catch {
                           return task.startTime;
                         }

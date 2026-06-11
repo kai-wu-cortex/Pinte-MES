@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Task, CustomFieldConfig } from '../types';
 import { DEFAULT_FIELD_CONFIG } from '../data';
 import { format, startOfWeek, endOfWeek, eachDayOfInterval, startOfMonth, endOfMonth, isSameDay, addMonths, subMonths, addWeeks, subWeeks, isSameMonth } from 'date-fns';
@@ -71,7 +71,7 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick }: Calenda
 
   // Initialize visible fields and intersect with fields marked as visible in fieldConfig
   // This ensures only fields marked visible in fieldConfig can be shown in the calendar view
-  const fieldConfigVisibleIds = useMemo(() => {
+  const fieldConfigVisibleIds = useMemo<Set<string>>(() => {
     return new Set(fieldConfig.filter(f => f.visible).map(f => f.fieldId));
   }, [fieldConfig]);
 
@@ -80,19 +80,17 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick }: Calenda
     fieldConfig.filter(field => field.visible).slice(0, 3).map(field => field.fieldId)
   );
 
-  // Automatically add any new visible fields from fieldConfig that are not already in visibleFieldsArr
-  useMemo(() => {
+  // Track field IDs we've already seen so we only auto-add genuinely new fields.
+  // Using useMemo to set state caused user-hidden fields to be re-added on every render,
+  // making "显示设置" toggle appear broken.
+  const knownFieldsRef = useRef<Set<string>>(new Set(visibleFieldsArr));
+  useEffect(() => {
     const allVisibleIds: string[] = Array.from(fieldConfigVisibleIds);
-    const hasNewFields = allVisibleIds.some((id: string) => !visibleFieldsArr.includes(id));
-    if (hasNewFields) {
-      // Add any missing fields to visibleFieldsArr (new fields should be visible by default)
-      const newVisible = [...visibleFieldsArr];
-      allVisibleIds.forEach((id: string) => {
-        if (!newVisible.includes(id)) {
-          newVisible.push(id);
-        }
-      });
-      setVisibleFieldsArr(newVisible);
+    const trulyNew: string[] = allVisibleIds.filter(id => !knownFieldsRef.current.has(id));
+    if (trulyNew.length > 0) {
+      trulyNew.forEach(id => knownFieldsRef.current.add(id));
+      const next: string[] = [...visibleFieldsArr, ...trulyNew];
+      setVisibleFieldsArr(next);
     }
   }, [fieldConfigVisibleIds, visibleFieldsArr, setVisibleFieldsArr]);
 
@@ -346,8 +344,11 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick }: Calenda
             {days.map((day, i) => {
               // Safe date parsing
               const dayTasks = filteredTasks.filter(t => {
+                if (!t.startTime) return false;
+                const d = new Date(t.startTime);
+                if (isNaN(d.getTime())) return false;
                 try {
-                  return isSameDay(new Date(t.startTime), day);
+                  return isSameDay(d, day);
                 } catch {
                   return false;
                 }
@@ -419,8 +420,10 @@ export function CalendarView({ tasks, onTaskClick, onProcessCardClick }: Calenda
 
                           // Special handling for date fields
                           if (field.id === 'startTime') {
+                            if (!value) return null;
+                            const dateValue = new Date(value as string);
+                            if (isNaN(dateValue.getTime())) return null;
                             try {
-                              const dateValue = new Date(value as string);
                               return (
                                 <div key={field.id} className="truncate text-slate-500">
                                   {format(dateValue, 'MM-dd HH:mm')}
