@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { format } from 'date-fns';
 import { Task, CustomFieldConfig, SortConfig } from '../types';
-import { DEFAULT_FIELD_CONFIG } from '../data';
 import { cn } from './MetricCard';
 import { Columns, Rows, Check, ListTree, ChevronDown, ChevronRight, GripVertical, FilterX, ChevronLeft, ChevronRight as ChevronRightIcon, ArrowDownAZ, ArrowUpAZ } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
@@ -52,6 +51,7 @@ const OPERATOR_LABELS: Record<FilterOperator, string> = {
 
 interface TableViewProps {
   tasks: Task[];
+  fieldConfig: CustomFieldConfig[];
   sortConfig: SortConfig;
   onSortChange: (sortConfig: SortConfig) => void;
   onTaskClick: (task: Task) => void;
@@ -89,8 +89,7 @@ function getDefaultWidth(fieldId: string): number {
   return widthMap[fieldId] || 150;
 }
 
-export function TableView({ tasks, sortConfig, onSortChange, onTaskClick, onProcessCardClick }: TableViewProps) {
-  const [fieldConfig, setFieldConfig] = useLocalStorage<CustomFieldConfig[]>('mes_field_mapping_config', DEFAULT_FIELD_CONFIG);
+export function TableView({ tasks, fieldConfig, sortConfig, onSortChange, onTaskClick, onProcessCardClick }: TableViewProps) {
   const [spacing, setSpacing] = useLocalStorage<Spacing>('mes_table_spacing', 'compact');
 
   // Generate columns from field config
@@ -574,9 +573,9 @@ export function TableView({ tasks, sortConfig, onSortChange, onTaskClick, onProc
                           </td>
                         </tr>
                       )}
-                      {isExpanded && groupTasks.map((task) => (
+                      {isExpanded && groupTasks.map((task, index) => (
                         <tr
-                          key={task.id}
+                          key={task.fileWpsRow !== undefined ? `row:${task.fileWpsRow}` : `${task.id}:${index}`}
                           onClick={() => onTaskClick(task)}
                           className="hover:bg-slate-800/80 transition-colors group cursor-pointer"
                         >

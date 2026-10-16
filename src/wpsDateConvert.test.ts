@@ -47,4 +47,23 @@ const ten = convertWpsDateValue('10');
 const todayPrefix = new Date().toISOString().slice(0, 10);
 assert.notEqual(ten.slice(0, 10), todayPrefix);
 
+// Spreadsheet dates represent local production days, regardless of syntax.
+for (const raw of ['2026-10-16', '2026/10/16', '2026.10.16', '2026年10月16日', '２０２６年１０月１６日']) {
+  const date = new Date(convertWpsDateValue(raw));
+  assert.equal(date.getFullYear(), 2026);
+  assert.equal(date.getMonth(), 9);
+  assert.equal(date.getDate(), 16);
+  assert.equal(date.getHours(), 0);
+}
+const excelSerial = (Date.UTC(2026, 9, 16) - Date.UTC(1899, 11, 30)) / 86400000;
+for (const hour of [0, 8, 20]) {
+  const date = new Date(convertWpsDateValue(excelSerial + hour / 24));
+  assert.equal(date.getDate(), 16);
+  assert.equal(date.getHours(), hour);
+}
+for (const raw of ['2026-02-30', '2026/13/01', '2026年10月16日备注', '2026/10/16 25:00', '10月16日']) {
+  assert.equal(convertWpsDateValue(raw), '');
+}
+assert.equal(convertWpsDateValue('2026-10-16T08:30:00+08:00'), '2026-10-16T00:30:00.000Z');
+assert.equal(convertWpsDateValue(new Date('invalid')), '');
 console.log('wpsDateConvert tests passed');

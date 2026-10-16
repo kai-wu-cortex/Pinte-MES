@@ -2,12 +2,12 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { AlertTriangle, Check, ChevronsRight, Circle, CircleDot, Factory, FilterX, Grid2X2, Layers, LayoutGrid, List, ListTree, Palette, Search, Settings2 } from 'lucide-react';
 import { Task, CustomFieldConfig } from '../types';
-import { DEFAULT_FIELD_CONFIG } from '../data';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 import { cn } from './MetricCard';
 
 interface ProcessCardViewProps {
   tasks: Task[];
+  fieldConfig: CustomFieldConfig[];
   totalTaskCount?: number;
   onTaskClick: (task: Task) => void;
   onProcessCardClick: (task: Task) => void;
@@ -442,8 +442,7 @@ const ProcessRow: React.FC<{ task: Task; onTaskClick: (task: Task) => void; onPr
   );
 }
 
-export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskClick, onProcessCardClick }: ProcessCardViewProps) {
-  const [fieldConfig] = useLocalStorage<CustomFieldConfig[]>('mes_field_mapping_config', DEFAULT_FIELD_CONFIG);
+export function ProcessCardView({ tasks, fieldConfig, totalTaskCount = tasks.length, onTaskClick, onProcessCardClick }: ProcessCardViewProps) {
   const [displayMode, setDisplayMode] = useState<'list' | 'grid'>('list');
   const [cardSize, setCardSize] = useLocalStorage<CardSize>('mes_process_cardSize', 'md');
   const [groupBy, setGroupBy] = useLocalStorage<string>('mes_process_groupBy', 'none');
@@ -781,9 +780,9 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
               )}
               {displayMode === 'grid' ? (
                 <div key={`grid-${cardSize}`} className={cn('grid gap-3 content-start', getProcessCardGridColumns(cardSize))}>
-                  {groupTasks.map(task => (
+                  {groupTasks.map((task, index) => (
                     <ProcessGridCard
-                      key={task.id}
+                      key={task.fileWpsRow !== undefined ? `row:${task.fileWpsRow}` : `${task.id}:${index}`}
                       task={task}
                       onTaskClick={onTaskClick}
                       onProcessCardClick={onProcessCardClick}
@@ -795,9 +794,9 @@ export function ProcessCardView({ tasks, totalTaskCount = tasks.length, onTaskCl
                 </div>
               ) : (
                 <div key="list" className="flex flex-col gap-2">
-                  {groupTasks.map(task => (
+                  {groupTasks.map((task, index) => (
                     <ProcessRow
-                      key={task.id}
+                      key={task.fileWpsRow !== undefined ? `row:${task.fileWpsRow}` : `${task.id}:${index}`}
                       task={task}
                       onTaskClick={onTaskClick}
                       onProcessCardClick={onProcessCardClick}

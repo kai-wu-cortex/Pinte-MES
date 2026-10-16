@@ -1,0 +1,174 @@
+.floor-theme-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  border: 1px solid #1e3a5f;
+  border-radius: 8px;
+  background: #0f172a;
+  color: #cbd5e1;
+  flex-shrink: 0;
+}
+.floor-theme-control select {
+  background: transparent;
+  color: inherit;
+  color-scheme: dark;
+  font-size: 12px;
+  min-height: 28px;
+  max-width: 90px;
+}
+.floor-theme-control option { background: #0f172a; color: #cbd5e1; }
+.floor-theme-control select:focus-visible { outline: 2px solid #5bd4d3; outline-offset: 2px; }
+
+@media (max-width: 1279px) {
+  .mes-floor-classic .classic-floor-layout { display: flex; flex-direction: column; overflow-y: auto; }
+  .mes-floor-classic .classic-floor-queue { flex-shrink: 0; min-height: 540px; }
+  .mes-floor-classic .classic-floor-sidebar { flex-shrink: 0; min-height: 480px; }
+}
+
+.mes-floor-apple {
+  --apple-canvas: #f5f5f7;
+  --apple-surface: #fff;
+  --apple-label: #1d1d1f;
+  --apple-secondary: #626268;
+  --apple-separator: #dcdce1;
+  --apple-fill: #e9e9ed;
+  --apple-hover: #f0f0f3;
+  --apple-link: #0071e3;
+  --apple-green: #287a4b;
+  --apple-note: #895b13;
+  --apple-nav: rgba(255, 255, 255, .86);
+  background: var(--apple-canvas);
+  color: var(--apple-label);
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Helvetica Neue', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  letter-spacing: 0;
+  color-scheme: light;
+}
+.mes-floor-apple ::selection { background: #cce3fa; color: var(--apple-label); }
+.mes-floor-apple .app-toolbar {
+  background: var(--apple-nav);
+  border-color: var(--apple-separator);
+  backdrop-filter: saturate(150%) blur(20px);
+  -webkit-backdrop-filter: saturate(150%) blur(20px);
+  padding-inline: 24px;
+  gap: 12px;
+}
+.mes-floor-apple .app-brand h1 { color: var(--apple-label); background: none; -webkit-text-fill-color: currentColor; letter-spacing: 0; font-weight: 600; }
+.mes-floor-apple .app-brand-symbol { background: var(--apple-link); box-shadow: none; border-radius: 8px; }
+.mes-floor-apple .app-search input { background: var(--apple-hover); border-color: transparent; color: var(--apple-label); }
+.mes-floor-apple .app-search input::placeholder { color: var(--apple-secondary); }
+.mes-floor-apple .app-search > svg { color: var(--apple-secondary); }
+.mes-floor-apple .app-view-switch { background: var(--apple-fill); border-color: transparent; border-radius: 8px; gap: 2px; }
+.mes-floor-apple .app-view-switch button { color: var(--apple-secondary); background: transparent; box-shadow: none; border-radius: 5px; min-height: 36px; transition: background-color 120ms ease, color 120ms ease; }
+.mes-floor-apple .app-view-switch button:hover { color: var(--apple-label); }
+.mes-floor-apple .app-view-switch button[data-active='true'] { background: var(--apple-surface); color: var(--apple-link); box-shadow: 0 1px 3px #00000012; }
+.mes-floor-apple .app-sort-control { background: transparent; border-color: var(--apple-separator); }
+.mes-floor-apple .app-sort-control :is(svg, select, button) { color: var(--apple-secondary); }
+.mes-floor-apple .app-sort-control option { background: var(--apple-surface); color: var(--apple-label); }
+.mes-floor-apple .app-sort-control button:hover { background: var(--apple-hover); color: var(--apple-label); }
+.mes-floor-apple .app-clock { color: var(--apple-secondary); background: transparent; border-color: transparent; font-family: inherit; font-variant-numeric: tabular-nums; }
+.mes-floor-apple .app-clock > svg { color: var(--apple-secondary); }
+.mes-floor-apple .app-action { color: var(--apple-secondary); background: transparent; border-color: transparent; width: 44px; height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+.mes-floor-apple .app-action:hover { background: var(--apple-fill); color: var(--apple-label); }
+.mes-floor-apple .floor-theme-control { background: var(--apple-hover); color: var(--apple-secondary); border-color: var(--apple-separator); }
+.mes-floor-apple .floor-theme-control select { color-scheme: light; }
+.mes-floor-apple .floor-theme-control option { background: var(--apple-surface); color: var(--apple-label); }
+.mes-floor-apple .floor-theme-control select:focus-visible { outline-color: var(--apple-link); }
+.mes-floor-apple main > div { background: var(--apple-canvas); }
+
+.mes-floor-apple .floor-display {
+  --floor-bg: var(--apple-canvas);
+  --floor-surface: var(--apple-surface);
+  --floor-line: var(--apple-separator);
+  --floor-muted: var(--apple-secondary);
+  --floor-teal: var(--apple-link);
+  color: var(--apple-label);
+  font-family: inherit;
+}
+.mes-floor-apple .floor-summary { padding-block: 20px; background: var(--apple-surface); gap: 24px; }
+.mes-floor-apple .floor-title h2 { font-size: 26px; font-weight: 650; }
+.mes-floor-apple .floor-title > span { font-size: 14px; }
+.mes-floor-apple .floor-metric strong { font-size: 27px; font-weight: 600; }
+.mes-floor-apple .floor-metric > span { font-size: 13px; }
+.mes-floor-apple .floor-metric small { color: var(--apple-secondary); }
+.mes-floor-apple .floor-queue { padding-inline: 24px; padding-bottom: 20px; }
+.mes-floor-apple .floor-section-header { min-height: 64px; }
+.mes-floor-apple .floor-section-header h3 { font-size: 17px; font-weight: 600; gap: 8px; }
+.mes-floor-apple .floor-section-header h3 > svg { color: var(--apple-secondary); stroke-width: 1.6; }
+.mes-floor-apple .floor-queue-grid { gap: 12px; }
+.mes-floor-apple .floor-order { border-color: #dedee3; border-radius: 8px; box-shadow: 0 1px 2px #00000005; padding: 16px; gap: 8px; transition: border-color 120ms ease, box-shadow 120ms ease; }
+.mes-floor-apple .floor-order:hover { border-color: #b7b7bf; box-shadow: 0 2px 8px #00000008; }
+.mes-floor-apple .floor-sequence { color: var(--apple-secondary); font-size: 14px; font-weight: 500; }
+.mes-floor-apple .floor-process { color: #236475; background: #edf5f7; border-color: transparent; border-radius: 4px; font-size: 12px; padding: 2px 8px; }
+.mes-floor-apple .floor-process-green { color: var(--apple-green); background: #edf5ef; }
+.mes-floor-apple .floor-order-id { color: var(--apple-link); font-size: 13px; font-weight: 500; }
+.mes-floor-apple .floor-product { font-size: 22px; font-weight: 600; line-height: 1.3; }
+.mes-floor-apple .floor-order-fields { column-gap: 8px; }
+.mes-floor-apple .floor-field { font-size: 14px; column-gap: 4px; }
+.mes-floor-apple .floor-label { color: var(--apple-secondary); font-size: 12px; }
+.mes-floor-apple .floor-order-note { color: var(--apple-note); padding-top: 10px; border-top: 1px solid #ededf0; }
+.mes-floor-apple .floor-order-note > svg { opacity: .85; }
+.mes-floor-apple .floor-sidebar { background: #f9f9fb; padding-inline: 24px; }
+.mes-floor-apple .floor-machine-heading strong { color: var(--apple-label); font-size: 28px; font-weight: 600; }
+.mes-floor-apple .floor-machine-heading > span { color: var(--apple-secondary); }
+.mes-floor-apple .floor-machine-heading b { font-size: 22px; font-weight: 600; }
+.mes-floor-apple .floor-machine-heading b small { color: var(--apple-secondary); }
+.mes-floor-apple .floor-machine-heading[aria-pressed='true'] { outline-color: var(--apple-link); }
+.mes-floor-apple .floor-volume-track { background: #e3e7e5; height: 5px; }
+.mes-floor-apple .floor-volume-track > div { background: #5b9c77; }
+.mes-floor-apple .floor-machine-orders button { color: var(--apple-link); }
+.mes-floor-apple .floor-note > span { color: var(--apple-link); }
+.mes-floor-apple .floor-note { padding-block: 8px; }
+.mes-floor-apple .floor-note p { color: var(--apple-note); line-height: 1.5; }
+.mes-floor-apple .floor-note:hover { background: var(--apple-hover); }
+.mes-floor-apple .floor-display select { background: var(--apple-surface); color: var(--apple-label); border-color: var(--apple-separator); color-scheme: light; min-height: 32px; }
+.mes-floor-apple .floor-icon-button { background: var(--apple-surface); border-color: var(--apple-separator); color: var(--apple-secondary); border-radius: 6px; width: 36px; height: 36px; }
+.mes-floor-apple .floor-icon-button:hover:not(:disabled) { background: var(--apple-hover); color: var(--apple-label); }
+.mes-floor-apple .floor-field-popup { background: var(--apple-surface); color: var(--apple-label); border-color: var(--apple-separator); border-radius: 8px; box-shadow: 0 8px 24px #00000012; }
+.mes-floor-apple .floor-field-popup button:hover { background: var(--apple-hover); }
+.mes-floor-apple .floor-field-popup svg { color: var(--apple-link); }
+.mes-floor-apple .floor-footer { background: var(--apple-surface); border-color: var(--apple-separator); }
+.mes-floor-apple .floor-rotation { color: var(--apple-secondary); }
+.mes-floor-apple .floor-pagination { color: var(--apple-label); }
+.mes-floor-apple .floor-display button:focus-visible, .mes-floor-apple .floor-display select:focus-visible { outline-color: var(--apple-link); }
+
+.mes-floor-apple > .fixed { z-index: 10000; background: #1d1d1f45; backdrop-filter: blur(8px); }
+.mes-floor-apple > .fixed > div { background: var(--apple-surface); border-color: var(--apple-separator); color: var(--apple-label); }
+.mes-floor-apple > .fixed [class*='bg-slate-'] { background: var(--apple-canvas); }
+.mes-floor-apple > .fixed :is(.text-slate-100, .text-slate-200, .text-white) { color: var(--apple-label); }
+.mes-floor-apple > .fixed :is(.text-slate-300, .text-slate-400, .text-slate-500) { color: var(--apple-secondary); }
+.mes-floor-apple > .fixed :is(.text-blue-300, .text-blue-400) { color: var(--apple-link); }
+.mes-floor-apple > .fixed :is([class*='border-blue-900'], [class*='border-slate-700']) { border-color: var(--apple-separator); }
+.mes-floor-apple > .fixed button:hover { color: var(--apple-label); }
+.mes-floor-apple > .fixed select { color-scheme: light; color: var(--apple-label); }
+.mes-floor-apple > .fixed [class*='text-amber-'] { color: var(--apple-note); }
+.mes-floor-apple > .fixed [class*='bg-amber-'] { background: #faf5eb; border-color: #e4d4b7; }
+.mes-floor-apple > .fixed [class*='text-emerald-'] { color: var(--apple-green); }
+.mes-floor-apple > .fixed :is(.bg-blue-600, .bg-blue-500, .bg-emerald-600, .bg-green-600) { color: white; }
+.mes-floor-apple > .fixed button.bg-slate-700 { background: var(--apple-fill); color: var(--apple-label); }
+
+@media (min-width: 768px) and (max-width: 1599px) {
+  .mes-floor-apple .app-clock { display: none; }
+  .mes-floor-apple .app-search input { width: 160px; }
+  .mes-floor-apple .app-toolbar { padding-inline: 16px; gap: 8px; }
+}
+
+@media (max-width: 767px) {
+  .mes-floor-apple .app-toolbar { padding-inline: 12px; }
+  .mes-floor-apple .floor-summary { padding: 16px 12px; gap: 12px; }
+  .mes-floor-apple .floor-title h2 { font-size: 26px; }
+  .mes-floor-apple .floor-queue { padding-inline: 12px; }
+  .mes-floor-apple .floor-sidebar { padding-inline: 12px; }
+  .mes-floor-apple .floor-metric strong { font-size: 27px; }
+  .mes-floor-apple .floor-section-header { gap: 6px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mes-floor-apple *, .mes-floor-apple *::before, .mes-floor-apple *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
+@media (prefers-reduced-transparency: reduce) {
+  .mes-floor-apple .app-toolbar { background: var(--apple-surface); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
+@media (prefers-contrast: more) {
+  .mes-floor-apple { --apple-secondary: #454549; --apple-separator: #a5a5ac; --apple-link: #005bb8; --apple-green: #1c6137; --apple-note: #71480a; }
+  .mes-floor-apple .floor-order { border-color: var(--apple-separator); }
+}

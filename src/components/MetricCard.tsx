@@ -22,20 +22,20 @@ export function MetricCard({ title, value, icon, trend, trendUp, className, acti
     <div 
       onClick={onClick}
       className={cn(
-        "bg-slate-800/50 border border-blue-900/50 rounded-xl p-4 flex flex-col backdrop-blur-sm transition-all", 
+        "min-w-0 bg-slate-800/50 border border-blue-900/50 rounded-lg p-2 sm:p-4 flex flex-col backdrop-blur-sm transition-all",
         onClick && "cursor-pointer hover:bg-slate-800/80 hover:-translate-y-0.5 hover:shadow-lg",
         active && "ring-2 ring-blue-500 bg-slate-800/90 shadow-[0_0_15px_rgba(59,130,246,0.3)]",
         className
       )}
     >
-      <div className="flex justify-between items-start mb-2">
-        <span className="text-slate-400 text-sm font-medium">{title}</span>
-        <div className="p-2 bg-blue-900/30 rounded-lg text-blue-400">
+      <div className="flex justify-between items-start gap-1 mb-2">
+        <span className="text-slate-400 text-[11px] sm:text-sm font-medium">{title}</span>
+        <div className="hidden sm:block p-2 bg-blue-900/30 rounded-lg text-blue-400">
           {icon}
         </div>
       </div>
       <div className="flex items-baseline gap-2">
-        <span className="text-2xl font-bold text-slate-100">{value}</span>
+        <span className="text-lg sm:text-2xl font-bold text-slate-100 break-all">{value}</span>
         {trend && (
           <span className={cn("text-xs font-medium", trendUp ? "text-emerald-400" : "text-rose-400")}>
             {trendUp ? '↑' : '↓'} {trend}

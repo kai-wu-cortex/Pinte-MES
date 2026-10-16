@@ -1,8 +1,9 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef, Suspense } from 'react';
 import { MetricCard } from './components/MetricCard';
+import { DateStrip } from './components/DateStrip';
 import { INITIAL_TASKS, MACHINES } from './data';
 import { fetchTasksFromWps, getWpsAccessToken, getCellAttachments, cachedToken, syncTasksFromWps } from './services/wps';
-import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Search, Loader2, CheckCircle, XCircle, Factory, ArrowDownAZ, ArrowUpAZ, MonitorUp, Maximize2, Minimize2 } from 'lucide-react';
+import { LayoutDashboard, TableProperties, KanbanSquare, Activity, CheckCircle2, Clock, Settings as SettingsIcon, Search, Loader2, CheckCircle, XCircle, Factory, ArrowDownAZ, ArrowUpAZ, MonitorUp, Maximize2, Minimize2, Palette } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from './components/MetricCard';
 import { AnimatePresence, motion } from 'motion/react';
@@ -10,8 +11,10 @@ import { Task, CustomFieldConfig, SortConfig } from './types';
 import { DEFAULT_FIELD_CONFIG } from './data';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { getNextDailySyncDelayMs } from './syncSchedule';
-import { filterTasksByToday, isTaskOnDate } from './dateFilters';
+import { indexTasksByDate, isTaskOnDate } from './dateFilters';
 import { DEFAULT_SORT_CONFIG, getSortFieldOptions, sortTasks } from './sorting';
+import { resolveFloorTheme, type FloorTheme } from './floorTheme';
+import './components/FloorDisplayApple.css';
 
 // Lazy load heavy components that are not always visible
 const TableView = React.lazy(() => import('./components/TableView').then(m => ({ default: m.TableView })));
@@ -19,20 +22,26 @@ const CalendarView = React.lazy(() => import('./components/CalendarView').then(m
 const TaskView = React.lazy(() => import('./components/TaskView').then(m => ({ default: m.TaskView })));
 const ProcessCardView = React.lazy(() => import('./components/ProcessCardView').then(m => ({ default: m.ProcessCardView })));
 const FloorDisplayView = React.lazy(() => import('./components/FloorDisplayView').then(m => ({ default: m.FloorDisplayView })));
+const ClassicFloorDisplayView = React.lazy(() => import('./components/ClassicFloorDisplayView').then(m => ({ default: m.ClassicFloorDisplayView })));
 const TaskDetailModal = React.lazy(() => import('./components/TaskDetailModal').then(m => ({ default: m.TaskDetailModal })));
 const SettingsModal = React.lazy(() => import('./components/SettingsModal').then(m => ({ default: m.SettingsModal })));
 const ExcelPreviewModal = React.lazy(() => import('./components/ExcelPreviewModal').then(m => ({ default: m.ExcelPreviewModal })));
 
 type ViewMode = 'table' | 'calendar' | 'task' | 'processCard' | 'floor';
+const EMPTY_TASKS: Task[] = [];
 
 export default function App() {
   const [viewMode, setViewMode] = useLocalStorage<ViewMode>('mes_viewMode', 'calendar');
+  const [savedFloorTheme, setFloorTheme] = useLocalStorage<FloorTheme | 'industrial'>('mes_floor_appearance', 'apple');
+  const floorTheme = resolveFloorTheme(savedFloorTheme);
+  const isAppleFloor = viewMode === 'floor' && floorTheme === 'apple';
+  const isClassicFloor = viewMode === 'floor' && floorTheme === 'classic';
   const [tasks, setTasks] = useLocalStorage<Task[]>('mes_tasks', INITIAL_TASKS);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [previewTask, setPreviewTask] = useState<Task | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterToday, setFilterToday] = useState(false);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [sortConfig, setSortConfig] = useLocalStorage<SortConfig>('mes_sortConfig', DEFAULT_SORT_CONFIG);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -96,17 +105,18 @@ export default function App() {
     return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
   }, []);
 
+  const todayKey = currentTime.slice(0, 10);
   const metrics = useMemo(() => {
-    const today = new Date();
+    const today = new Date(`${todayKey}T00:00:00`);
     const totalOrders = tasks.length;
     const todayTasks = tasks.filter(t => isTaskOnDate(t, today));
     const todayCount = todayTasks.length;
     const todayVolume = todayTasks.reduce((sum, t) => sum + (t.plannedQuantity || 0), 0);
 
     return { totalOrders, todayCount, todayVolume };
-  }, [tasks]);
+  }, [tasks, todayKey]);
 
-  const filteredTasks = useMemo(() => {
+  const searchedTasks = useMemo(() => {
     let filtered = tasks;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
@@ -119,20 +129,23 @@ export default function App() {
         t.process.toLowerCase().includes(q)
       );
     }
-    return filterTasksByToday(filtered, filterToday);
-  }, [tasks, searchQuery, filterToday]);
+    return filtered;
+  }, [tasks, searchQuery]);
 
-  const sortedTasks = useMemo(() => sortTasks(filteredTasks, sortConfig), [filteredTasks, sortConfig]);
+  // Sort once per data/search/order change. Date switches reuse indexed arrays.
+  const sortedSearchTasks = useMemo(() => sortTasks(searchedTasks, sortConfig), [searchedTasks, sortConfig]);
+  const tasksByDate = useMemo(() => indexTasksByDate(sortedSearchTasks), [sortedSearchTasks]);
+  const sortedTasks = selectedDate ? tasksByDate.get(selectedDate) ?? EMPTY_TASKS : sortedSearchTasks;
   const sortFields = useMemo(() => getSortFieldOptions(fieldConfig), [fieldConfig]);
   const currentSortLabel = sortFields.find(field => field.id === sortConfig.fieldId)?.label || sortConfig.fieldId;
-  const filteredViewKey = `${filterToday ? 'today' : 'all'}:${searchQuery}:${sortConfig.fieldId}:${sortConfig.direction}`;
+  const filteredViewKey = `${selectedDate ?? 'all'}:${searchQuery}:${sortConfig.fieldId}:${sortConfig.direction}`;
 
-  const showAllTasks = () => setFilterToday(false);
-  const showTodayTasks = () => setFilterToday(true);
+  const showAllTasks = () => setSelectedDate(null);
+  const showTodayTasks = () => setSelectedDate(todayKey);
 
-  const handleTaskClick = (task: Task) => {
+  const handleTaskClick = useCallback((task: Task) => {
     setSelectedTask(task);
-  };
+  }, []);
 
   const updateSortField = (fieldId: string) => {
     setSortConfig(prev => ({ ...prev, fieldId }));
@@ -142,8 +155,13 @@ export default function App() {
     setSortConfig(prev => ({ ...prev, direction: prev.direction === 'asc' ? 'desc' : 'asc' }));
   };
 
+  const switchView = (mode: ViewMode) => {
+    setViewMode(mode);
+  };
+
   const openFloorDisplay = () => {
-    setViewMode('floor');
+    setSelectedDate(null);
+    switchView('floor');
   };
 
   const toggleFullscreen = async () => {
@@ -159,9 +177,9 @@ export default function App() {
   };
 
   // Handle process card click - open modal, modal handles getting attachment via WebOffice SDK
-  const handleProcessCardClick = async (task: Task) => {
+  const handleProcessCardClick = useCallback((task: Task) => {
     setPreviewTask(task);
-  };
+  }, []);
 
   // Use ref to keep latest references without changing function identity
   const syncRef = useRef({ tasks, setTasks, setSyncResponse, setIsSyncing, setToast });
@@ -341,10 +359,10 @@ export default function App() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200 font-sans selection:bg-blue-500/30 flex flex-col">
-      <header className="min-h-16 border-b border-blue-900/50 bg-slate-900/80 backdrop-blur-md flex items-center justify-between gap-3 px-4 py-2 sticky top-0 z-50">
-        <div className="flex items-center gap-3 shrink-0">
-          <div className="w-8 h-8 rounded bg-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(37,99,235,0.5)]">
+    <div className={cn('h-dvh min-h-0 overflow-hidden text-slate-200 font-sans selection:bg-blue-500/30 flex flex-col bg-slate-950', isAppleFloor && 'mes-floor-apple', isClassicFloor && 'mes-floor-classic')}>
+      <header className="app-toolbar min-h-16 shrink-0 border-b backdrop-blur-md flex flex-wrap items-center justify-between gap-3 px-4 py-2 sticky top-0 z-[9999] border-blue-900/50 bg-slate-900/80">
+        <div className="app-brand flex items-center gap-3 shrink-0">
+          <div className="app-brand-symbol w-8 h-8 rounded bg-blue-600 flex items-center justify-center shadow-[0_0_15px_rgba(37,99,235,0.5)]">
             <Activity className="w-5 h-5 text-white" />
           </div>
           <h1 className="text-lg xl:text-xl font-bold bg-gradient-to-r from-blue-400 to-cyan-300 bg-clip-text text-transparent tracking-wide whitespace-nowrap">
@@ -353,7 +371,7 @@ export default function App() {
         </div>
         
         <div className="flex items-center justify-end gap-2 flex-wrap min-w-0">
-          <div className="relative">
+          <div className="app-search relative">
             <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
             <input
               type="text"
@@ -364,9 +382,10 @@ export default function App() {
             />
           </div>
 
-          <div className="flex bg-slate-950 rounded-lg p-1 border border-blue-900/50">
+          <div className="app-view-switch flex bg-slate-950 rounded-lg p-1 border border-blue-900/50">
             <button
-              onClick={() => setViewMode('table')}
+              data-active={viewMode === 'table'}
+              onClick={() => switchView('table')}
               className={cn(
                 "flex items-center gap-1.5 px-2 xl:px-3 py-1.5 rounded-md text-xs xl:text-sm font-medium transition-all whitespace-nowrap",
                 viewMode === 'table' ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
@@ -376,7 +395,8 @@ export default function App() {
               表格
             </button>
             <button
-              onClick={() => setViewMode('calendar')}
+              data-active={viewMode === 'calendar'}
+              onClick={() => switchView('calendar')}
               className={cn(
                 "flex items-center gap-1.5 px-2 xl:px-3 py-1.5 rounded-md text-xs xl:text-sm font-medium transition-all whitespace-nowrap",
                 viewMode === 'calendar' ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
@@ -386,7 +406,8 @@ export default function App() {
               日历
             </button>
             <button
-              onClick={() => setViewMode('task')}
+              data-active={viewMode === 'task'}
+              onClick={() => switchView('task')}
               className={cn(
                 "flex items-center gap-1.5 px-2 xl:px-3 py-1.5 rounded-md text-xs xl:text-sm font-medium transition-all whitespace-nowrap",
                 viewMode === 'task' ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
@@ -396,7 +417,8 @@ export default function App() {
               任务
             </button>
             <button
-              onClick={() => setViewMode('processCard')}
+              data-active={viewMode === 'processCard'}
+              onClick={() => switchView('processCard')}
               className={cn(
                 "flex items-center gap-1.5 px-2 xl:px-3 py-1.5 rounded-md text-xs xl:text-sm font-medium transition-all whitespace-nowrap",
                 viewMode === 'processCard' ? "bg-blue-600 text-white shadow-md" : "text-slate-400 hover:text-slate-200 hover:bg-slate-800"
@@ -406,6 +428,7 @@ export default function App() {
               流程
             </button>
             <button
+              data-active={viewMode === 'floor'}
               onClick={openFloorDisplay}
               className={cn(
                 "flex items-center gap-1.5 px-2 xl:px-3 py-1.5 rounded-md text-xs xl:text-sm font-medium transition-all whitespace-nowrap",
@@ -417,7 +440,7 @@ export default function App() {
             </button>
           </div>
 
-          <div className="flex items-center gap-1 bg-slate-950 rounded-lg p-1 border border-blue-900/50">
+          <div className="app-sort-control flex items-center gap-1 bg-slate-950 rounded-lg p-1 border border-blue-900/50">
             <ArrowDownAZ className="w-4 h-4 text-slate-500 ml-1" />
             <select
               value={sortConfig.fieldId}
@@ -440,7 +463,7 @@ export default function App() {
             </button>
           </div>
           
-          <div className="text-xs xl:text-sm font-mono text-blue-300 bg-blue-950/50 px-2 xl:px-3 py-1.5 rounded-lg border border-blue-900/50 flex items-center gap-2 whitespace-nowrap">
+          <div className="app-clock text-xs xl:text-sm font-mono text-blue-300 bg-blue-950/50 px-2 xl:px-3 py-1.5 rounded-lg border border-blue-900/50 flex items-center gap-2 whitespace-nowrap">
             <Clock className="w-4 h-4" />
             {currentTime}
           </div>
@@ -475,9 +498,17 @@ export default function App() {
             )}
           </AnimatePresence>
 
+          {viewMode === 'floor' && <div className="floor-theme-control" title="大屏主题">
+            <Palette className="h-4 w-4" aria-hidden="true" />
+            <select aria-label="大屏主题" value={floorTheme} onChange={event => setFloorTheme(resolveFloorTheme(event.target.value))}>
+              <option value="apple">苹果主题</option>
+              <option value="classic">原版主题</option>
+            </select>
+          </div>}
+
           <button
             onClick={() => setShowSettings(true)}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700"
+            className="app-action p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors border border-transparent hover:border-slate-700"
             title="数据源配置"
           >
             <SettingsIcon className="w-5 h-5" />
@@ -485,7 +516,7 @@ export default function App() {
           <button
             onClick={toggleFullscreen}
             className={cn(
-              "p-2 rounded-lg transition-colors border",
+              "app-action p-2 rounded-lg transition-colors border",
               isFullscreen
                 ? "text-emerald-200 bg-emerald-500/15 border-emerald-400/30 hover:bg-emerald-500/25"
                 : "text-slate-400 hover:text-white hover:bg-slate-800 border-transparent hover:border-slate-700"
@@ -497,14 +528,14 @@ export default function App() {
         </div>
       </header>
 
-      <main className={cn("flex-1 flex flex-col overflow-hidden", viewMode === 'floor' ? "p-3 gap-3" : "p-6 gap-6")}>
-        {viewMode !== 'floor' && <div className="grid grid-cols-1 md:grid-cols-3 gap-4 shrink-0">
+      <main className={cn('flex-1 min-h-0 flex flex-col overflow-hidden', isAppleFloor ? 'p-0' : isClassicFloor ? 'p-3 gap-3' : 'p-3 sm:p-4 gap-3')}>
+        {viewMode !== 'floor' && <div className="grid grid-cols-3 gap-2 sm:gap-4 shrink-0">
           <MetricCard
             title="所有生产单"
             value={metrics.totalOrders}
             icon={<LayoutDashboard className="w-5 h-5" />}
             onClick={showAllTasks}
-            active={!filterToday}
+            active={selectedDate === null}
           />
           <MetricCard
             title="当日计划生产数"
@@ -512,7 +543,7 @@ export default function App() {
             icon={<Activity className="w-5 h-5" />}
             className="border-blue-500/30"
             onClick={showTodayTasks}
-            active={filterToday}
+            active={selectedDate === todayKey}
           />
           <MetricCard
             title="当日计划生产量"
@@ -520,11 +551,15 @@ export default function App() {
             icon={<CheckCircle2 className="w-5 h-5" />}
             className="border-emerald-500/30"
             onClick={showTodayTasks}
-            active={filterToday}
+            active={selectedDate === todayKey}
           />
         </div>}
 
-        <div className={cn("flex-1 min-h-0 overflow-auto bg-slate-900/20 border border-blue-900/30 shadow-inner relative", viewMode === 'floor' ? "rounded-lg p-2" : "rounded-xl p-4")}>
+        {['table', 'task', 'processCard'].includes(viewMode) && (
+          <DateStrip selectedDate={selectedDate} today={todayKey} tasksByDate={tasksByDate} onSelect={setSelectedDate} />
+        )}
+
+        <div className={cn('flex-1 min-h-0 overflow-auto relative', isAppleFloor ? 'bg-transparent' : isClassicFloor ? 'bg-slate-900/20 border border-blue-900/30 rounded-lg p-2' : 'bg-slate-900/20 border border-blue-900/30 shadow-inner rounded-xl p-4')}>
           <AnimatePresence mode="wait">
             <motion.div
               key={viewMode}
@@ -535,11 +570,12 @@ export default function App() {
               className="h-full"
             >
               <Suspense fallback={<div className="flex items-center justify-center h-full"><Loader2 className="w-8 h-8 animate-spin text-blue-400" /></div>}>
-                {viewMode === 'table' && <TableView key={`table:${filteredViewKey}`} tasks={sortedTasks} sortConfig={sortConfig} onSortChange={setSortConfig} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
+                {viewMode === 'table' && <TableView tasks={sortedTasks} fieldConfig={fieldConfig} sortConfig={sortConfig} onSortChange={setSortConfig} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
                 {viewMode === 'calendar' && <CalendarView key={`calendar:${filteredViewKey}`} tasks={sortedTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
-                {viewMode === 'task' && <TaskView key={`task:${filteredViewKey}`} tasks={sortedTasks} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
-                {viewMode === 'processCard' && <ProcessCardView key={`process:${filteredViewKey}`} tasks={sortedTasks} totalTaskCount={tasks.length} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
-                {viewMode === 'floor' && <FloorDisplayView key={`floor:${filteredViewKey}`} tasks={sortedTasks} metrics={metrics} currentTime={currentTime} sortLabel={currentSortLabel} sortDirection={sortConfig.direction} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
+                {viewMode === 'task' && <TaskView tasks={sortedTasks} fieldConfig={fieldConfig} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
+                {viewMode === 'processCard' && <ProcessCardView tasks={sortedTasks} fieldConfig={fieldConfig} totalTaskCount={tasks.length} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
+                {isAppleFloor && <FloorDisplayView tasks={sortedSearchTasks} fieldConfig={fieldConfig} metrics={metrics} currentTime={currentTime} sortLabel={currentSortLabel} sortDirection={sortConfig.direction} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
+                {isClassicFloor && <ClassicFloorDisplayView tasks={sortedSearchTasks} fieldConfig={fieldConfig} metrics={metrics} currentTime={currentTime} sortLabel={currentSortLabel} sortDirection={sortConfig.direction} onTaskClick={handleTaskClick} onProcessCardClick={handleProcessCardClick} />}
               </Suspense>
             </motion.div>
           </AnimatePresence>

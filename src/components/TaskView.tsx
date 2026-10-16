@@ -1,13 +1,13 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { Task, CustomFieldConfig } from '../types';
-import { DEFAULT_FIELD_CONFIG } from '../data';
 import { cn } from './MetricCard';
 import { format } from 'date-fns';
-import { Calendar, Clock, User, Settings, FileText, LayoutGrid, Settings2, Check, Hash, Box, Activity, ListTree } from 'lucide-react';
+import { Calendar, User, Settings, FileText, LayoutGrid, Settings2, Check, Hash, Box, Activity, ListTree, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, ClipboardList } from 'lucide-react';
 import { useLocalStorage } from '../hooks/useLocalStorage';
 
 interface TaskViewProps {
   tasks: Task[];
+  fieldConfig: CustomFieldConfig[];
   onTaskClick: (task: Task) => void;
   onProcessCardClick: (task: Task) => void;
 }
@@ -39,8 +39,8 @@ interface TaskField {
 
 interface TaskCardProps {
   task: Task;
-  onClick: () => void;
-  onProcessCardClick: (url: string) => void;
+  onClick: (task: Task) => void;
+  onProcessCardClick: (task: Task) => void;
   size: 'sm' | 'md' | 'lg';
   visibleFields: Set<string>;
   taskFields: TaskField[];
@@ -57,7 +57,7 @@ export function formatTaskPlanDate(startTime: string): string {
   }
 }
 
-const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onProcessCardClick, size, visibleFields, taskFields }) => {
+const TaskCard = React.memo(function TaskCard({ task, onClick, onProcessCardClick, size, visibleFields, taskFields }: TaskCardProps) {
   const sizeClasses = {
     sm: 'p-2 gap-1 text-[10px]',
     md: 'p-3 gap-2 text-xs',
@@ -91,12 +91,11 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onProcessCardClick, 
       return <span className="break-words">{task.notes || ''}</span>;
     }
 
-    return <span className="break-words">{task[fieldId as keyof Task] || ''}</span>;
+    return <span className="break-words">{task[fieldId as keyof Task] ?? ''}</span>;
   };
 
   // Split fields into header fields (id, process, productName) and body fields
   const headerFieldIds = ['id', 'process', 'productName'];
-  const headerFields = taskFields.filter(f => headerFieldIds.includes(f.id) && visibleFields.has(f.id));
   const bodyFields = taskFields.filter(f => !headerFieldIds.includes(f.id) && visibleFields.has(f.id));
 
   // Get field icon component
@@ -107,7 +106,8 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onProcessCardClick, 
 
   return (
     <div
-      onClick={onClick}
+      onClick={() => onClick(task)}
+      data-task-card
       className={cn("bg-slate-800/80 border border-slate-700 hover:border-blue-500/50 transition-all rounded-lg flex flex-col shadow-lg cursor-pointer hover:-translate-y-0.5", sizeClasses[size])}
     >
       <div className="flex justify-between items-start">
@@ -145,10 +145,9 @@ const TaskCard: React.FC<TaskCardProps> = ({ task, onClick, onProcessCardClick, 
       </div>
     </div>
   );
-}
+});
 
-export function TaskView({ tasks, onTaskClick, onProcessCardClick }: TaskViewProps) {
-  const [fieldConfig, setFieldConfig] = useLocalStorage<CustomFieldConfig[]>('mes_field_mapping_config', DEFAULT_FIELD_CONFIG);
+export const TaskView = React.memo(function TaskView({ tasks, fieldConfig, onTaskClick, onProcessCardClick }: TaskViewProps) {
   const [cardSize, setCardSize] = useLocalStorage<'sm' | 'md' | 'lg'>('mes_task_cardSize', 'md');
 
   // Generate TASK_FIELDS from field config
@@ -190,6 +189,20 @@ export function TaskView({ tasks, onTaskClick, onProcessCardClick }: TaskViewPro
   }, [visibleFieldsArr, fieldConfigVisibleIds]);
 
   const [groupBy, setGroupBy] = useLocalStorage<string>('mes_task_groupBy', 'none');
+  const [savedPageSize, setPageSize] = useLocalStorage<number>('mes_task_pageSize', 48);
+  const pageSize = [48, 96, 144].includes(savedPageSize) ? savedPageSize : 48;
+  const [pagination, setPagination] = useState({ tasks, groupBy, pageSize, page: 1 });
+  const totalPages = Math.max(1, Math.ceil(tasks.length / pageSize));
+  // A new selection starts on page one immediately, without briefly rendering
+  // the previous page or remounting the view and re-reading localStorage.
+  const currentPage = pagination.tasks === tasks && pagination.groupBy === groupBy && pagination.pageSize === pageSize
+    ? Math.min(pagination.page, totalPages) : 1;
+  if (pagination.tasks !== tasks || pagination.groupBy !== groupBy || pagination.pageSize !== pageSize) {
+    setPagination({ tasks, groupBy, pageSize, page: 1 });
+  }
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const goToPage = (page: number) => setPagination({ tasks, groupBy, pageSize, page });
+  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = 0; }, [tasks, currentPage, groupBy, pageSize]);
   const [showFieldMenu, setShowFieldMenu] = useState(false);
   const [showSizeMenu, setShowSizeMenu] = useState(false);
   const [showGroupMenu, setShowGroupMenu] = useState(false);
@@ -215,8 +228,19 @@ export function TaskView({ tasks, onTaskClick, onProcessCardClick }: TaskViewPro
       if (!acc[key]) acc[key] = [];
       acc[key].push(task);
       return acc;
-    }, {} as Record<string, Task[]>);
+    }, Object.create(null) as Record<string, Task[]>);
   }, [tasks, groupBy]);
+
+  const paginatedGroups = useMemo(() => {
+    const ordered = groupBy === 'none' ? tasks : Object.values(groupedTasks).flat();
+    const page = ordered.slice((currentPage - 1) * pageSize, currentPage * pageSize);
+    if (groupBy === 'none') return { '所有任务': page };
+    return page.reduce((groups, task) => {
+      const key = String(task[groupBy] || '未分组');
+      (groups[key] ??= []).push(task);
+      return groups;
+    }, Object.create(null) as Record<string, Task[]>);
+  }, [tasks, groupedTasks, groupBy, currentPage, pageSize]);
 
   const gridCols = {
     sm: 'grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-8',
@@ -224,12 +248,12 @@ export function TaskView({ tasks, onTaskClick, onProcessCardClick }: TaskViewPro
     lg: 'grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5'
   };
 
-  const Toolbar = () => (
-    <div className="flex justify-between items-center px-4 py-2 border-b border-blue-900/50 bg-slate-800/50 shrink-0">
+  const toolbar = (
+    <div className="flex flex-wrap gap-2 justify-between items-center px-3 py-2 border-b border-blue-900/50 bg-slate-800/50 shrink-0">
       <div className="text-sm text-slate-400 font-medium">
         共 {tasks.length} 条记录
       </div>
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-2">
         {/* Group Menu */}
         <div className="relative">
           <button
@@ -328,26 +352,40 @@ export function TaskView({ tasks, onTaskClick, onProcessCardClick }: TaskViewPro
   );
 
   return (
-    <div className="flex flex-col h-full bg-slate-900/40 rounded-xl border border-blue-900/30 overflow-hidden">
-      <Toolbar />
-      <div className="flex-1 overflow-y-auto p-4">
+    <div className="flex flex-col h-full min-h-0 bg-slate-900/40 rounded-lg border border-blue-900/30 overflow-hidden">
+      {toolbar}
+      <div ref={scrollRef} className="flex-1 min-h-0 overflow-y-auto p-3">
+        {tasks.length === 0 && <div className="flex min-h-32 items-center justify-center gap-2 text-sm text-slate-400"><ClipboardList className="h-5 w-5" />没有符合条件的生产单</div>}
         <div className="space-y-6">
-          {Object.entries(groupedTasks as Record<string, Task[]>).map(([groupName, groupTasks]) => (
+          {Object.entries(paginatedGroups as Record<string, Task[]>).map(([groupName, groupTasks]) => (
             <div key={groupName} className="space-y-3">
               {groupBy !== 'none' && (
                 <h3 className="text-sm font-bold text-blue-100 bg-slate-800/50 px-3 py-1.5 rounded border border-blue-900/30">
-                  {groupName} ({groupTasks.length})
+                  {groupName} ({groupedTasks[groupName]?.length ?? 0})
                 </h3>
               )}
               <div className={cn("grid gap-3", gridCols[cardSize as keyof typeof gridCols])}>
-                {groupTasks.map(task => (
-                  <TaskCard key={task.id} task={task} onClick={() => onTaskClick(task)} onProcessCardClick={onProcessCardClick} size={cardSize as 'sm' | 'md' | 'lg'} visibleFields={visibleFields} taskFields={TASK_FIELDS} />
+                {groupTasks.map((task, index) => (
+                  <TaskCard key={task.fileWpsRow !== undefined ? `row:${task.fileWpsRow}` : `${task.id}:${(currentPage - 1) * pageSize + index}`} task={task} onClick={onTaskClick} onProcessCardClick={onProcessCardClick} size={cardSize as 'sm' | 'md' | 'lg'} visibleFields={visibleFields} taskFields={TASK_FIELDS} />
                 ))}
               </div>
             </div>
           ))}
         </div>
       </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-blue-900/50 px-3 py-2 text-xs text-slate-400 shrink-0">
+        <span aria-live="polite">{tasks.length ? `${(currentPage - 1) * pageSize + 1}–${Math.min(currentPage * pageSize, tasks.length)}` : '0'} / {tasks.length} 条</span>
+        <div className="flex items-center gap-1">
+          <select aria-label="每页生产单数量" value={pageSize} onChange={event => setPageSize(Number(event.target.value))} className="mr-2 rounded border border-slate-700 bg-slate-900 px-1 py-1 text-slate-200">
+            {[48, 96, 144].map(size => <option key={size} value={size}>{size} 条/页</option>)}
+          </select>
+          <button type="button" aria-label="第一页" title="第一页" disabled={currentPage === 1} onClick={() => goToPage(1)} className="p-1.5 rounded hover:bg-slate-800 disabled:opacity-30"><ChevronsLeft className="h-4 w-4" /></button>
+          <button type="button" aria-label="上一页" title="上一页" disabled={currentPage === 1} onClick={() => goToPage(currentPage - 1)} className="p-1.5 rounded hover:bg-slate-800 disabled:opacity-30"><ChevronLeft className="h-4 w-4" /></button>
+          <span className="min-w-14 text-center tabular-nums">{currentPage} / {totalPages}</span>
+          <button type="button" aria-label="下一页" title="下一页" disabled={currentPage === totalPages} onClick={() => goToPage(currentPage + 1)} className="p-1.5 rounded hover:bg-slate-800 disabled:opacity-30"><ChevronRight className="h-4 w-4" /></button>
+          <button type="button" aria-label="最后一页" title="最后一页" disabled={currentPage === totalPages} onClick={() => goToPage(totalPages)} className="p-1.5 rounded hover:bg-slate-800 disabled:opacity-30"><ChevronsRight className="h-4 w-4" /></button>
+        </div>
+      </div>
     </div>
   );
-}
+});

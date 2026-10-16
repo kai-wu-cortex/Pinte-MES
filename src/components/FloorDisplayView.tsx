@@ -1,19 +1,17 @@
-import React, { useMemo, useState } from 'react';
-import { format, isToday } from 'date-fns';
-import { motion } from 'motion/react';
-import { AlertTriangle, ArrowDownAZ, ArrowUpAZ, CalendarClock, Check, FileSpreadsheet, Gauge, MonitorUp, Settings2 } from 'lucide-react';
-import { CustomFieldConfig, SortDirection, Task } from '../types';
-import { DEFAULT_FIELD_CONFIG } from '../data';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { ArrowDownAZ, ArrowUpAZ, CalendarDays, Check, ChevronLeft, ChevronRight, ClipboardList, Factory, FileText, Pause, Play, RotateCw, Settings2 } from 'lucide-react';
+import type { CustomFieldConfig, SortDirection, Task } from '../types';
 import { useLocalStorage } from '../hooks/useLocalStorage';
+import { getTaskDateKey } from '../dateFilters';
+import { getFloorCapacity, getFloorPage, groupFloorMachines } from '../floorDisplay';
+import type { FloorMachineGroup } from '../floorDisplay';
 import { cn } from './MetricCard';
+import './FloorDisplayView.css';
 
 interface FloorDisplayViewProps {
   tasks: Task[];
-  metrics: {
-    totalOrders: number;
-    todayCount: number;
-    todayVolume: number;
-  };
+  fieldConfig: CustomFieldConfig[];
+  metrics: { totalOrders: number; todayCount: number; todayVolume: number };
   currentTime: string;
   sortLabel: string;
   sortDirection: SortDirection;
@@ -21,376 +19,197 @@ interface FloorDisplayViewProps {
   onProcessCardClick: (task: Task) => void;
 }
 
-const FLOOR_CARD_DEFAULT_FIELDS = ['id', 'process', 'machineName', 'productName', 'specification', 'plannedQuantity', 'startTime', 'notes'];
+const DEFAULT_FIELDS = ['id', 'process', 'machineName', 'productName', 'specification', 'plannedQuantity', 'startTime', 'notes'];
+const SPECIAL_FIELDS = new Set(['id', 'process', 'productName', 'notes']);
+const numberFormat = new Intl.NumberFormat('zh-CN');
 
-function formatPlanTime(value: string): string {
-  if (!value) return '未排期';
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return '未排期';
-  return format(date, 'MM-dd HH:mm');
+function taskKey(task: Task, index: number) {
+  return task.fileWpsRow !== undefined ? `row:${task.fileWpsRow}` : `${task.id}:${index}`;
 }
 
-function getProcessTone(process: string) {
-  if (process.includes('涂布')) return 'border-blue-400/50 bg-blue-500/15 text-blue-100 shadow-[0_0_8px_rgba(59,130,246,0.15)]';
-  if (process.includes('模压')) return 'border-amber-400/50 bg-amber-500/15 text-amber-100 shadow-[0_0_8px_rgba(245,158,11,0.15)]';
-  if (process.includes('分切')) return 'border-emerald-400/50 bg-emerald-500/15 text-emerald-100 shadow-[0_0_8px_rgba(16,185,129,0.15)]';
-  return 'border-cyan-400/50 bg-cyan-500/15 text-cyan-100 shadow-[0_0_8px_rgba(6,182,212,0.15)]';
+function fieldValue(task: Task, id: string) {
+  const value = task[id];
+  if (id === 'startTime' || id === 'endTime') return getTaskDateKey(String(value ?? '')) ?? '未排期';
+  if (id === 'plannedQuantity') return `${numberFormat.format(task.plannedQuantity || 0)} m`;
+  if (typeof value === 'number') return numberFormat.format(value);
+  return String(value ?? '') || '-';
 }
 
-function formatFieldValue(task: Task, fieldId: string): string {
-  if (fieldId === 'startTime' || fieldId === 'endTime') return formatPlanTime(String(task[fieldId] || ''));
-  if (fieldId === 'plannedQuantity') return `${task.plannedQuantity || 0}m`;
-  return String(task[fieldId as keyof Task] ?? '');
-}
+interface DisplayField { id: string; label: string }
 
-const ProductionCard: React.FC<{
-  task: Task;
-  index: number;
-  fields: { id: string; label: string }[];
-  onTaskClick: (task: Task) => void;
-  onProcessCardClick: (task: Task) => void;
-}> = ({ task, index, fields, onTaskClick, onProcessCardClick }) => {
-  const hasNote = Boolean(task.notes?.trim());
-  const showId = fields.some(field => field.id === 'id');
-  const showProcess = fields.some(field => field.id === 'process');
-  const showProduct = fields.some(field => field.id === 'productName');
-  const showNotes = fields.some(field => field.id === 'notes');
-  const secondaryFields = fields.filter(field => !['id', 'process', 'productName', 'notes'].includes(field.id));
-
+const ProductionCard = React.memo(function ProductionCard({ task, index, fields, onTaskClick, onProcessCardClick }: {
+  task: Task; index: number; fields: DisplayField[];
+  onTaskClick: (task: Task) => void; onProcessCardClick: (task: Task) => void;
+}) {
+  const visible = new Set(fields.map(field => field.id));
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 12 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.3, delay: Math.min(index * 0.04, 0.6) }}
-      onClick={() => onTaskClick(task)}
-      className="group min-h-[140px] cursor-pointer overflow-hidden rounded-lg border border-slate-700/60 bg-gradient-to-br from-slate-900/80 to-slate-950/90 p-3.5 hover:border-cyan-300/40 hover:shadow-[0_0_20px_rgba(6,182,212,0.08)] transition-all duration-300 flex flex-col gap-2.5"
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-[10px] text-slate-500/80">{String(index + 1).padStart(2, '0')}</span>
-            {showId && (
-              <button
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onProcessCardClick(task);
-                }}
-                className="truncate font-mono text-sm font-bold text-cyan-200 group-hover:text-cyan-100 transition-colors"
-              >
-                {task.id}
-              </button>
-            )}
-          </div>
-          {showProduct && (
-            <div className="mt-1.5 truncate text-[15px] font-semibold text-slate-50 group-hover:text-white transition-colors" title={task.productName}>
-              {task.productName || '-'}
-            </div>
-          )}
-        </div>
-        {showProcess && (
-          <span className={cn('shrink-0 rounded-md border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider', getProcessTone(task.process))}>
-            {task.process || '工艺'}
-          </span>
-        )}
+    <article className="floor-order" data-floor-card onClick={() => onTaskClick(task)}>
+      <div className="floor-order-head">
+        <span className="floor-sequence">{String(index + 1).padStart(2, '0')}</span>
+        {visible.has('process') && <span className={cn('floor-process', task.process.includes('胶') || task.process.includes('分切') ? 'floor-process-green' : '')}>{task.process || '未指定工艺'}</span>}
+        {visible.has('id') && <button type="button" title="打开电子流程卡" onClick={event => { event.stopPropagation(); onProcessCardClick(task); }} className="floor-order-id">{task.id || '未填卡号'}<ChevronRight size={14} /></button>}
       </div>
-
-      {secondaryFields.length > 0 && (
-        <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-[11px] mt-auto">
-          {secondaryFields.map(field => (
-            <div key={field.id} className={cn('min-w-0', field.id === 'specification' && 'col-span-2')}>
-              <span className="block text-[9px] text-slate-500/70 uppercase tracking-wider mb-0.5">{field.label}</span>
-              <span className="block truncate font-medium text-slate-200/90" title={formatFieldValue(task, field.id)}>
-                {formatFieldValue(task, field.id) || '-'}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {showNotes && (
-        <div className={cn(
-          'rounded-md border px-2.5 py-1.5 text-[11px] transition-colors',
-          hasNote
-            ? 'border-amber-300/30 bg-amber-400/8 text-amber-100/90'
-            : 'border-slate-700/40 bg-slate-800/40 text-slate-500/60'
-        )}>
-          <span className="line-clamp-2">{hasNote ? task.notes : '无工艺备注'}</span>
-        </div>
-      )}
-    </motion.div>
+      {visible.has('productName') && <h4 title={task.productName} className="floor-product">{task.productName || '未填写品名'}</h4>}
+      <div className="floor-order-fields">
+        {fields.filter(field => !SPECIAL_FIELDS.has(field.id)).map(field => (
+          <div key={field.id} className="floor-field">
+            <span className="floor-label">{field.label}</span>
+            <span title={fieldValue(task, field.id)}>{fieldValue(task, field.id)}</span>
+          </div>
+        ))}
+      </div>
+      {visible.has('notes') && <p className="floor-order-note" title={task.notes || '无工艺备注'}><FileText size={14} /><span>{task.notes || '无工艺备注'}</span></p>}
+    </article>
   );
-};
+});
 
-export function FloorDisplayView({ tasks, metrics, currentTime, sortLabel, sortDirection, onTaskClick, onProcessCardClick }: FloorDisplayViewProps) {
-  const [fieldConfig] = useLocalStorage<CustomFieldConfig[]>('mes_field_mapping_config', DEFAULT_FIELD_CONFIG);
-  const [showFieldMenu, setShowFieldMenu] = useState(false);
-  const [visibleFieldsArr, setVisibleFieldsArr] = useLocalStorage<string[]>('mes_floor_visibleFields', FLOOR_CARD_DEFAULT_FIELDS);
+export function FloorDisplayView({ tasks, fieldConfig, metrics, currentTime, sortLabel, sortDirection, onTaskClick, onProcessCardClick }: FloorDisplayViewProps) {
+  const todayKey = currentTime.slice(0, 10);
+  const [showFields, setShowFields] = useState(false);
+  const [visibleFields, setVisibleFields] = useLocalStorage<string[]>('mes_floor_visibleFields', DEFAULT_FIELDS);
+  const [playing, setPlaying] = useLocalStorage<boolean>('mes_floor_autoRotate', true);
+  const [savedInterval, setIntervalSeconds] = useLocalStorage<number>('mes_floor_rotateSeconds', 20);
+  const intervalSeconds = [10, 20, 30, 60].includes(savedInterval) ? savedInterval : 20;
+  const [machine, setMachine] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageVisible, setPageVisible] = useState(() => !document.hidden);
+  const queueRef = useRef<HTMLDivElement>(null);
+  const [capacity, setCapacity] = useState({ columns: 3, rows: 3, pageSize: 9 });
+  const machinePageSize = capacity.rows >= 3 ? 2 : 1;
+  const notePageSize = capacity.rows >= 3 ? 3 : 2;
 
-  const floorFields = useMemo(() => {
-    const fields = fieldConfig
-      .filter(field => field.visible)
-      .map(field => ({ id: field.fieldId, label: field.displayName }));
-    return fields.length > 0 ? fields : DEFAULT_FIELD_CONFIG.map(field => ({ id: field.fieldId, label: field.displayName }));
-  }, [fieldConfig]);
+  const fields = useMemo(() => fieldConfig.filter(field => field.visible).map(field => ({ id: field.fieldId, label: field.displayName })), [fieldConfig]);
+  const cardFields = useMemo(() => fields.filter(field => visibleFields.includes(field.id)), [fields, visibleFields]);
+  const todayTasks = useMemo(() => tasks.filter(task => getTaskDateKey(task.startTime) === todayKey), [tasks, todayKey]);
+  const machineGroups = useMemo(() => groupFloorMachines(todayTasks), [todayTasks]);
+  const effectiveMachine = machineGroups.some(group => group.machine === machine) ? machine : '';
+  const queue = useMemo(() => effectiveMachine ? machineGroups.find(group => group.machine === effectiveMachine)?.tasks ?? [] : todayTasks, [todayTasks, machineGroups, effectiveMachine]);
+  const noteTasks = useMemo(() => queue.filter(task => task.notes?.trim()), [queue]);
+  const volume = useMemo(() => todayTasks.reduce((sum, task) => sum + (task.plannedQuantity || 0), 0), [todayTasks]);
+  const queuePages = Math.max(1, Math.ceil(queue.length / capacity.pageSize));
+  const machinePages = Math.max(1, Math.ceil(machineGroups.length / machinePageSize));
+  const notePages = Math.max(1, Math.ceil(noteTasks.length / notePageSize));
+  const pageCount = Math.max(queuePages, machinePages, notePages);
+  const currentPage = Math.min(page, pageCount);
+  const queuePage = ((currentPage - 1) % queuePages) + 1;
+  const displayTasks = getFloorPage<Task>(queue, currentPage, capacity.pageSize);
+  const displayMachines = getFloorPage<FloorMachineGroup>(machineGroups, currentPage, machinePageSize);
+  const displayNotes = getFloorPage<Task>(noteTasks, currentPage, notePageSize);
 
-  const fieldIds = useMemo<Set<string>>(() => new Set(floorFields.map(field => field.id)), [floorFields]);
-  const visibleFields = useMemo<Set<string>>(() => new Set(visibleFieldsArr.filter(id => fieldIds.has(id))), [visibleFieldsArr, fieldIds]);
-  const visibleCardFields = useMemo(() => floorFields.filter(field => visibleFields.has(field.id)), [floorFields, visibleFields]);
-
-  const todayTasks = useMemo(() => {
-    return tasks.filter(task => {
-      const date = new Date(task.startTime);
-      return !Number.isNaN(date.getTime()) && isToday(date);
+  useLayoutEffect(() => {
+    const element = queueRef.current;
+    if (!element) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const next = getFloorCapacity(entry.contentRect.width, entry.contentRect.height);
+      setCapacity(previous => previous.columns === next.columns && previous.rows === next.rows ? previous : next);
     });
-  }, [tasks]);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
-  const displayTasks = useMemo(() => todayTasks.slice(0, 24), [todayTasks]);
+  useEffect(() => { setPage(1); }, [todayTasks, effectiveMachine, capacity.pageSize]);
+  useEffect(() => {
+    const onVisibility = () => setPageVisible(!document.hidden);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => document.removeEventListener('visibilitychange', onVisibility);
+  }, []);
+  useEffect(() => {
+    if (!playing || showFields || !pageVisible || pageCount < 2) return;
+    const timer = window.setInterval(() => setPage(previous => previous >= pageCount ? 1 : previous + 1), intervalSeconds * 1000);
+    return () => window.clearInterval(timer);
+  }, [playing, showFields, pageVisible, pageCount, intervalSeconds, page]);
 
-  const machineGroups = useMemo(() => {
-    const groups: Record<string, Task[]> = {};
-    tasks.forEach(task => {
-      const key = task.machineName || '未分配机台';
-      if (!groups[key]) groups[key] = [];
-      groups[key].push(task);
-    });
-
-    return Object.entries(groups)
-      .map(([machine, machineTasks]) => ({ machine, tasks: machineTasks.slice(0, 6), count: machineTasks.length }))
-      .slice(0, 8);
-  }, [tasks]);
-
-  const noteTasks = useMemo(() => tasks.filter(task => task.notes?.trim()).slice(0, 12), [tasks]);
-
-  const toggleField = (id: string) => {
-    const next = new Set<string>(visibleFields);
-    if (next.has(id)) {
-      if (next.size > 1) next.delete(id);
-    } else {
-      next.add(id);
-    }
-    setVisibleFieldsArr(Array.from(next));
-  };
+  const openTask = (task: Task) => { setPlaying(false); onTaskClick(task); };
+  const openCard = (task: Task) => { setPlaying(false); onProcessCardClick(task); };
+  const toggleField = (id: string) => setVisibleFields(previous => previous.includes(id)
+    ? cardFields.length > 1 ? previous.filter(field => field !== id) : previous
+    : [...previous, id]);
 
   return (
-    <div className="h-full min-h-0 flex flex-col gap-2 overflow-hidden bg-slate-950 text-slate-100">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -8 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="shrink-0 flex items-center justify-between gap-4 rounded-xl border border-cyan-400/20 bg-gradient-to-r from-slate-900/90 via-slate-900/80 to-cyan-950/30 px-5 py-3.5 backdrop-blur-sm"
-      >
-        <div className="min-w-[14rem]">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-cyan-500/10 border border-cyan-400/20">
-              <MonitorUp className="w-5 h-5 text-cyan-300" />
-            </div>
-            <h2 className="whitespace-nowrap text-xl 2xl:text-2xl font-bold tracking-wide bg-gradient-to-r from-slate-50 to-cyan-100 bg-clip-text text-transparent">
-              生产执行大屏
-            </h2>
-            <span className="rounded-md border border-cyan-300/25 bg-cyan-300/8 px-2.5 py-1 text-[11px] font-mono text-cyan-100/90">
-              排序: {sortLabel} {sortDirection === 'asc' ? '↑' : '↓'}
-            </span>
-          </div>
-          <p className="mt-1.5 max-w-xl text-xs text-slate-400/80">按当前筛选和排序生成当日生产卡片，突出机台负载和工艺备注。</p>
+    <div className="floor-display">
+      <header className="floor-summary">
+        <div className="floor-title"><h2>生产执行看板</h2><span>{todayKey.replaceAll('-', '.')}</span></div>
+        <div className="floor-metrics">
+          <Metric label="当日生产单" value={numberFormat.format(todayTasks.length)} unit="单" />
+          <Metric label="计划生产量" value={numberFormat.format(volume)} unit="m" />
+          <Metric label="排产机台" value={numberFormat.format(machineGroups.filter(group => group.machine !== '未分配机台').length)} unit="台" />
+          <Metric label="数据总量" value={numberFormat.format(metrics.totalOrders)} unit="单" />
         </div>
-        <div className="flex shrink-0 items-center gap-3 text-right">
-          <motion.div
-            initial={{ scale: 0.95, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.2 }}
-            className="rounded-lg border border-cyan-400/25 bg-slate-950/60 px-4 py-2.5"
-          >
-            <div className="text-[10px] text-slate-500/80 uppercase tracking-wider">当前时间</div>
-            <div className="font-mono text-xl font-bold text-cyan-200 tracking-wider">{currentTime}</div>
-          </motion.div>
-          <div className="grid grid-cols-3 gap-2">
-            <MetricBox label="生产单" value={metrics.totalOrders} delay={0.1} />
-            <MetricBox label="今日单数" value={metrics.todayCount} delay={0.2} />
-            <MetricBox label="今日米数" value={`${metrics.todayVolume}m`} delay={0.3} />
-          </div>
-        </div>
-      </motion.div>
+      </header>
 
-      {/* Main Content */}
-      <div className="grid flex-1 min-h-0 grid-cols-1 xl:grid-cols-[1.6fr_1fr] gap-2 overflow-y-auto xl:overflow-hidden">
-        {/* Production Queue */}
-        <motion.section
-          initial={{ opacity: 0, x: -12 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4, delay: 0.15 }}
-          className="min-h-0 flex flex-col rounded-xl border border-slate-700/50 bg-gradient-to-b from-slate-900/60 to-slate-950/60 overflow-hidden"
-        >
-          <div className="shrink-0 flex items-center justify-between border-b border-slate-700/50 px-4 py-2.5 bg-slate-800/30">
-            <div className="flex items-center gap-2.5">
-              <div className="p-1.5 rounded-md bg-cyan-500/10 border border-cyan-400/15">
-                <CalendarClock className="w-4 h-4 text-cyan-300" />
+      <div className="floor-layout">
+        <section className="floor-queue" aria-label="当日生产队列">
+          <div className="floor-section-header">
+            <h3><ClipboardList size={20} />当日生产队列 <small>{queue.length} 单</small></h3>
+            <div className="floor-queue-controls">
+              <span className="floor-sort" title={`排序：${sortLabel}`}>{sortDirection === 'asc' ? <ArrowUpAZ size={15} /> : <ArrowDownAZ size={15} />}{sortLabel}</span>
+              <select aria-label="机台筛选" value={effectiveMachine} onChange={event => setMachine(event.target.value)}>
+                <option value="">全部机台</option>
+                {machineGroups.map(group => <option key={group.machine} value={group.machine}>{group.machine}</option>)}
+              </select>
+              <div className="floor-fields-menu">
+                <button type="button" title="卡片字段" aria-label="卡片字段" aria-expanded={showFields} onClick={() => setShowFields(!showFields)} className="floor-icon-button"><Settings2 size={18} /></button>
+                {showFields && <>
+                  <div className="fixed inset-0 z-40" onClick={() => setShowFields(false)} />
+                  <div className="floor-field-popup">
+                    {fields.map(field => <button type="button" role="menuitemcheckbox" aria-checked={visibleFields.includes(field.id)} key={field.id} onClick={() => toggleField(field.id)}>{field.label}{visibleFields.includes(field.id) && <Check size={14} />}</button>)}
+                  </div>
+                </>}
               </div>
-              <h3 className="text-sm font-bold text-slate-100">当日生产队列</h3>
-              <span className="text-[11px] text-slate-500/80 font-mono">
-                {displayTasks.length} / {todayTasks.length}
-              </span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="relative">
-                <button
-                  onClick={() => setShowFieldMenu(!showFieldMenu)}
-                  className="flex items-center gap-1.5 rounded-md border border-slate-700/60 bg-slate-950/50 px-2.5 py-1.5 text-xs text-slate-300 hover:border-cyan-300/40 hover:bg-slate-800/50 transition-colors"
-                >
-                  <Settings2 className="w-3.5 h-3.5" />
-                  字段
+          </div>
+          <div ref={queueRef} className="floor-queue-viewport">
+            {displayTasks.length ? <div className="floor-queue-grid" style={{ gridTemplateColumns: `repeat(${capacity.columns}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${capacity.rows}, minmax(0, 1fr))` }}>
+              {displayTasks.map((task, index) => <ProductionCard key={taskKey(task, index)} task={task} index={(queuePage - 1) * capacity.pageSize + index} fields={cardFields} onTaskClick={openTask} onProcessCardClick={openCard} />)}
+            </div> : <div className="floor-empty"><CalendarDays size={28} /><span>当日暂无符合条件的生产安排</span></div>}
+          </div>
+        </section>
+
+        <aside className="floor-sidebar">
+          <section className="floor-machines" aria-label="机台生产安排">
+            <div className="floor-section-header"><h3><Factory size={20} />机台生产安排</h3><small>{machineGroups.length} 组</small></div>
+            <div className="floor-machine-list">
+              {displayMachines.map(group => <div className="floor-machine" key={group.machine}>
+                <button type="button" className="floor-machine-heading" title={`查看${group.machine}生产单`} aria-pressed={effectiveMachine === group.machine} onClick={() => setMachine(effectiveMachine === group.machine ? '' : group.machine)}>
+                  <strong>{group.machine}</strong><span>{group.tasks.length} 单</span><b>{numberFormat.format(group.volume)} <small>m</small></b>
                 </button>
-                {showFieldMenu && (
-                  <>
-                    <div className="fixed inset-0 z-40" onClick={() => setShowFieldMenu(false)} />
-                    <div className="absolute right-0 top-full z-50 mt-1 max-h-72 w-44 overflow-y-auto rounded-lg border border-blue-900/50 bg-slate-800 py-1 shadow-xl">
-                      {floorFields.map(field => (
-                        <button
-                          key={field.id}
-                          onClick={() => toggleField(field.id)}
-                          className="flex w-full items-center justify-between px-3 py-2 text-left text-xs text-slate-300 hover:bg-slate-700 hover:text-white"
-                        >
-                          {field.label}
-                          {visibleFields.has(field.id) && <Check className="w-3.5 h-3.5 text-blue-400" />}
-                        </button>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className="flex items-center gap-1 text-cyan-300/80">
-                {sortDirection === 'asc' ? <ArrowUpAZ className="w-4 h-4" /> : <ArrowDownAZ className="w-4 h-4" />}
-              </div>
-            </div>
-          </div>
-
-          <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
-            {displayTasks.length > 0 ? (
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(280px,1fr))] gap-2.5 content-start">
-                {displayTasks.map((task, index) => (
-                  <ProductionCard
-                    key={task.id}
-                    task={task}
-                    index={index}
-                    fields={visibleCardFields}
-                    onTaskClick={onTaskClick}
-                    onProcessCardClick={onProcessCardClick}
-                  />
-                ))}
-              </div>
-            ) : (
-              <div className="flex h-full items-center justify-center rounded-lg border border-slate-800/50 text-sm text-slate-500/60">
-                当日暂无生产安排
-              </div>
-            )}
-          </div>
-        </motion.section>
-
-        {/* Sidebar */}
-        <motion.aside
-          initial={{ opacity: 0, x: 12 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.4, delay: 0.25 }}
-          className="min-h-[480px] xl:min-h-0 grid grid-rows-[1fr_1fr] gap-2"
-        >
-          {/* Machine Groups */}
-          <section className="min-h-0 rounded-xl border border-slate-700/50 bg-gradient-to-b from-slate-900/60 to-slate-950/60 overflow-hidden">
-            <PanelHeader icon={<Gauge className="w-4 h-4 text-emerald-300" />} title="机台生产安排" count={`${machineGroups.length} 组`} />
-            <div className="h-full overflow-y-auto p-2.5 space-y-2 pb-12 custom-scrollbar">
-              {machineGroups.map((group, groupIndex) => (
-                <motion.div
-                  key={group.machine}
-                  initial={{ opacity: 0, y: 8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ duration: 0.3, delay: 0.3 + groupIndex * 0.05 }}
-                  className="rounded-lg border border-slate-700/40 bg-slate-950/40 p-2.5 hover:border-slate-600/50 transition-colors"
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-400/80" />
-                      <span className="font-semibold text-slate-100 text-[13px]">{group.machine}</span>
-                    </div>
-                    <span className="text-[10px] text-slate-500/70 font-mono">{group.count} 单</span>
-                  </div>
-                  <div className="space-y-1">
-                    {group.tasks.map(task => (
-                      <button
-                        key={task.id}
-                        onClick={() => onTaskClick(task)}
-                        className="grid w-full grid-cols-[5.5rem_minmax(0,1fr)_4.5rem] gap-2 rounded-md bg-slate-900/60 px-2.5 py-1.5 text-left text-[11px] hover:bg-slate-800/70 hover:border-slate-700/50 border border-transparent transition-all"
-                      >
-                        <span className="font-mono text-cyan-200/90 truncate">{task.id}</span>
-                        <span className="text-slate-300/80 truncate">{task.productName}</span>
-                        <span className="font-mono text-slate-500/70 text-right">{formatPlanTime(task.startTime)}</span>
-                      </button>
-                    ))}
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-          </section>
-
-          {/* Notes */}
-          <section className="min-h-0 rounded-xl border border-slate-700/50 bg-gradient-to-b from-slate-900/60 to-slate-950/60 overflow-hidden">
-            <PanelHeader icon={<AlertTriangle className="w-4 h-4 text-amber-300" />} title="工艺备注" count={`${noteTasks.length} 条备注`} />
-            <div className="h-full min-h-0 overflow-y-auto p-2.5 pb-12 space-y-1.5 custom-scrollbar">
-              {noteTasks.map((task, noteIndex) => (
-                <motion.button
-                  key={task.id}
-                  initial={{ opacity: 0, x: 8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ duration: 0.25, delay: 0.4 + noteIndex * 0.03 }}
-                  onClick={() => onTaskClick(task)}
-                  className="block w-full rounded-lg border border-amber-300/15 bg-amber-400/5 px-3 py-2 text-left text-[11px] hover:border-amber-300/40 hover:bg-amber-400/10 transition-all"
-                >
-                  <div className="flex items-center gap-2 mb-0.5">
-                    <span className="font-mono text-amber-100/90 font-bold">{task.id}</span>
-                    <span className="text-slate-400/70">{task.machineName}</span>
-                    <span className="ml-auto font-mono text-slate-500/60 text-[10px]">{formatPlanTime(task.startTime)}</span>
-                  </div>
-                  <span className="block truncate text-amber-200/70 leading-relaxed">{task.notes}</span>
-                </motion.button>
-              ))}
-              {noteTasks.length === 0 && (
-                <div className="flex h-24 items-center justify-center rounded-lg border border-slate-800/50 text-xs text-slate-500/50">
-                  暂无工艺备注
+                <div className="floor-volume-track" title={`计划米数占当日计划米数 ${volume ? Math.round(group.volume / volume * 100) : 0}%`}><div style={{ width: `${volume ? Math.min(100, Math.max(0, group.volume / volume * 100)) : 0}%` }} /></div>
+                <div className="floor-machine-orders">
+                  {group.tasks.slice(0, 4).map((task, index) => <button type="button" key={taskKey(task, index)} onClick={() => openTask(task)} title={task.productName}>{task.id || task.productName || '未填卡号'}</button>)}
+                  {group.tasks.length > 4 && <button type="button" onClick={() => setMachine(group.machine)}>+{group.tasks.length - 4} 单</button>}
                 </div>
-              )}
+              </div>)}
+              {!displayMachines.length && <p className="floor-muted">暂无机台安排</p>}
             </div>
           </section>
-        </motion.aside>
+          <section className="floor-notes" aria-label="工艺备注">
+            <div className="floor-section-header"><h3><FileText size={20} />工艺备注</h3><small>{noteTasks.length} 条</small></div>
+            <div className="floor-note-list">
+              {displayNotes.map((task, index) => <button type="button" key={taskKey(task, index)} className="floor-note" onClick={() => openTask(task)} title={task.notes}>
+                <span>{task.id || '未填卡号'}<small>{task.machineName}</small></span><p>{task.notes}</p>
+              </button>)}
+              {!displayNotes.length && <p className="floor-muted">暂无工艺备注</p>}
+            </div>
+          </section>
+        </aside>
       </div>
-    </div>
-  );
-}
 
-function MetricBox({ label, value, delay = 0 }: { label: string; value: string | number; delay?: number }) {
-  return (
-    <motion.div
-      initial={{ scale: 0.9, opacity: 0 }}
-      animate={{ scale: 1, opacity: 1 }}
-      transition={{ duration: 0.4, delay }}
-      className="min-w-[5.5rem] rounded-lg border border-slate-700/50 bg-gradient-to-b from-slate-900/70 to-slate-950/80 px-3 py-2 hover:border-slate-600/50 transition-colors"
-    >
-      <div className="flex items-center justify-end gap-1 text-[10px] text-slate-500/70 uppercase tracking-wider">
-        <FileSpreadsheet className="w-3 h-3" />
-        {label}
-      </div>
-      <div className="font-mono text-lg font-bold text-slate-100 tracking-tight">{value}</div>
-    </motion.div>
-  );
-}
-
-function PanelHeader({ icon, title, count }: { icon: React.ReactNode; title: string; count: string }) {
-  return (
-    <div className="flex items-center justify-between border-b border-slate-700/50 px-4 py-2.5 bg-slate-800/20">
-      <div className="flex items-center gap-2.5">
-        <div className="p-1 rounded-md bg-slate-800/50">
-          {icon}
+      <footer className="floor-footer">
+        <div className="floor-pagination">
+          <button type="button" title="上一展示页" aria-label="上一展示页" disabled={pageCount <= 1} onClick={() => setPage(currentPage <= 1 ? pageCount : currentPage - 1)} className="floor-icon-button"><ChevronLeft size={18} /></button>
+          <span aria-live="polite">展示 {currentPage} / {pageCount}</span>
+          <button type="button" title="下一展示页" aria-label="下一展示页" disabled={pageCount <= 1} onClick={() => setPage(currentPage >= pageCount ? 1 : currentPage + 1)} className="floor-icon-button"><ChevronRight size={18} /></button>
+          <small>队列 {queuePage}/{queuePages}<span className="floor-footer-note-count">　备注 {(currentPage - 1) % notePages + 1}/{notePages}</span></small>
         </div>
-        <h3 className="text-sm font-bold text-slate-100">{title}</h3>
-      </div>
-      <span className="text-[10px] text-slate-500/70 font-mono">{count}</span>
+        <div className="floor-rotation"><RotateCw size={16} /><span>自动轮播</span>
+          <select aria-label="轮播间隔" value={intervalSeconds} onChange={event => setIntervalSeconds(Number(event.target.value))}>{[10, 20, 30, 60].map(seconds => <option key={seconds} value={seconds}>{seconds} 秒</option>)}</select>
+          <button type="button" title={playing ? '暂停轮播' : '开始轮播'} aria-label={playing ? '暂停轮播' : '开始轮播'} onClick={() => setPlaying(!playing)} className="floor-icon-button">{playing ? <Pause size={18} /> : <Play size={18} />}</button>
+        </div>
+      </footer>
     </div>
   );
+}
+
+function Metric({ label, value, unit }: { label: string; value: string; unit: string }) {
+  return <div className="floor-metric"><span>{label}</span><strong>{value}<small>{unit}</small></strong></div>;
 }
